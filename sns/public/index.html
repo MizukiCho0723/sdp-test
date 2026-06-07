@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNS - Shibaura Network Service</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Auth Section -->
+<div id="authSection">
+
+  <!-- Login Page -->
+  <div id="loginPage" class="auth-container">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <h1>SNS</h1>
+        <p>Shibaura Network Service</p>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>メールアドレス</label>
+          <input type="email" id="loginEmail" placeholder="xxxx@shibaura-it.ac.jp" required>
+        </div>
+        <div class="form-group">
+          <label>パスワード</label>
+          <input type="password" id="loginPassword" placeholder="パスワード" required>
+        </div>
+        <div id="loginError" class="error-msg"></div>
+        <button type="submit" class="btn btn-primary">ログイン</button>
+      </form>
+      <div class="auth-links">
+        <a href="#" id="toForgotPassword">パスワードを忘れた方はこちら</a><br>
+        <a href="#" id="toRegister">新規会員登録はこちら</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Page -->
+  <div id="registerPage" class="auth-container" style="display:none;">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <h1>SNS</h1>
+        <p>新規会員登録</p>
+      </div>
+
+      <!-- Step 1: Email -->
+      <div id="regStep1">
+        <div class="form-group">
+          <label>メールアドレス（@shibaura-it.ac.jp）</label>
+          <input type="email" id="regEmail" placeholder="xxxx@shibaura-it.ac.jp" required>
+        </div>
+        <div id="regStep1Error" class="error-msg"></div>
+        <button class="btn btn-primary" id="sendCodeBtn">認証コードを送信する</button>
+        <div class="auth-links"><a href="#" id="toLoginFromReg">ログイン画面へ</a></div>
+      </div>
+
+      <!-- Step 2: Code + Password -->
+      <div id="regStep2" style="display:none;">
+        <div class="form-group">
+          <label>認証コード（6桁）</label>
+          <input type="text" id="regCode" placeholder="123456" maxlength="6">
+        </div>
+        <div class="form-group">
+          <label>パスワード（8〜16文字、英数字記号を含む）</label>
+          <input type="password" id="regPassword" placeholder="パスワード">
+        </div>
+        <div class="form-group">
+          <label>パスワード（確認）</label>
+          <input type="password" id="regPasswordConfirm" placeholder="パスワード（再入力）">
+        </div>
+        <div id="regStep2Error" class="error-msg"></div>
+        <button class="btn btn-primary" id="verifyCodeBtn">次へ</button>
+      </div>
+
+      <!-- Step 3: Profile -->
+      <div id="regStep3" style="display:none;">
+        <div class="form-group">
+          <label>氏名 <span style="color:red">*</span></label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="regLastName" placeholder="芝浦" maxlength="16" style="flex:1;">
+            <input type="text" id="regFirstName" placeholder="太郎" maxlength="16" style="flex:1;">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>学年/職員/教員 <span style="color:red">*</span></label>
+          <select id="regGrade" onchange="onGradeChange('reg')">
+            <option value="">選択してください</option>
+            <option value="1">学部1年</option>
+            <option value="2">学部2年</option>
+            <option value="3">学部3年</option>
+            <option value="4">学部4年</option>
+            <option value="5">修士1年</option>
+            <option value="6">修士2年</option>
+            <option value="7">博士1年</option>
+            <option value="8">博士2年</option>
+            <option value="9">博士3年</option>
+            <option value="10">博士4年</option>
+            <option value="11">教員</option>
+            <option value="0">職員</option>
+          </select>
+        </div>
+        <div class="form-group" id="regFacultyGroup" style="display:none;">
+          <label>所属</label>
+          <select id="regFaculty" onchange="onFacultyChange('reg')">
+            <option value="">選択してください</option>
+            <option value="工学部">工学部</option>
+            <option value="システム理工学部">システム理工学部</option>
+            <option value="デザイン工学部">デザイン工学部</option>
+            <option value="建築学部">建築学部</option>
+            <option value="大学院 理工学研究科" style="display:none;">大学院 理工学研究科</option>
+          </select>
+        </div>
+        <div class="form-group" id="regGradGroup" style="display:none;">
+          <label>所属</label>
+          <div class="static-field">大学院 理工学研究科</div>
+        </div>
+        <div class="form-group" id="regGradCourseGroup" style="display:none;">
+          <label>専攻</label>
+          <select id="regGradCourseSelect">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-group" id="regStaffGroup" style="display:none;">
+          <label>所属</label>
+          <input type="text" id="regStaffDept" placeholder="学生課">
+        </div>
+        <div class="form-group" id="regCourseGroup" style="display:none;">
+          <label>課程・コース/学科</label>
+          <select id="regCourseSelect" onchange="onCourseChange('reg')">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-group" id="regSubCourseGroup" style="display:none;">
+          <label>コース</label>
+          <select id="regSubCourseSelect">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-group" id="regProgramGroup" style="display:none;">
+          <label>プログラム</label>
+          <select id="regProgram">
+            <option value="一般プログラム">一般プログラム</option>
+            <option value="国際プログラム">国際プログラム</option>
+          </select>
+        </div>
+        <div class="form-group" id="regLabGroup" style="display:none;">
+          <label>研究室</label>
+          <select id="regLabSelect" onchange="onLabSelectChange('reg')">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-group" id="regLabOtherGroup" style="display:none;">
+          <label>研究室（自由入力）</label>
+          <input type="text" id="regLabOther" placeholder="○○研究室(教員名)">
+        </div>
+        <div class="form-group">
+          <label>サークル・部活動</label>
+          <input type="text" id="regClubs" placeholder="△△部">
+        </div>
+        <div class="form-group">
+          <label>自己紹介</label>
+          <textarea id="regBio" placeholder="よろしくお願いします！"></textarea>
+        </div>
+        <div id="regStep3Error" class="error-msg"></div>
+        <button class="btn btn-primary" id="completeRegBtn">保存</button>
+      </div>
+
+      <!-- Step 4: Done -->
+      <div id="regStep4" style="display:none;">
+        <div style="text-align:center; padding: 20px 0;">
+          <div style="font-size:48px;">✅</div>
+          <h3 style="margin:16px 0 8px;">会員登録が完了しました</h3>
+          <p style="color:#65676b;">ログイン画面からサインインしてください</p>
+        </div>
+        <button class="btn btn-primary" id="toLoginFromDone">ログイン画面へ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Reset Page -->
+  <div id="resetPage" class="auth-container" style="display:none;">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <h1>SNS</h1>
+        <p>パスワードを再設定する</p>
+      </div>
+
+      <div id="resetStep1">
+        <div class="form-group">
+          <label>メールアドレス</label>
+          <input type="email" id="resetEmail" placeholder="xxxx@shibaura-it.ac.jp">
+        </div>
+        <div id="resetStep1Error" class="error-msg"></div>
+        <button class="btn btn-primary" id="resetSendCodeBtn">認証コードを送信する</button>
+        <div class="auth-links"><a href="#" id="toLoginFromReset">ログイン画面へ</a></div>
+      </div>
+
+      <div id="resetStep2" style="display:none;">
+        <div class="form-group">
+          <label>認証コード（6桁）</label>
+          <input type="text" id="resetCode" placeholder="123456" maxlength="6">
+        </div>
+        <div class="form-group">
+          <label>新しいパスワード</label>
+          <input type="password" id="resetPassword" placeholder="新しいパスワード">
+        </div>
+        <div class="form-group">
+          <label>新しいパスワード（確認）</label>
+          <input type="password" id="resetPasswordConfirm" placeholder="新しいパスワード（再入力）">
+        </div>
+        <div id="resetStep2Error" class="error-msg"></div>
+        <button class="btn btn-primary" id="resetSubmitBtn">次へ</button>
+      </div>
+
+      <div id="resetStep3" style="display:none;">
+        <div style="text-align:center; padding: 20px 0;">
+          <div style="font-size:48px;">✅</div>
+          <h3 style="margin:16px 0 8px;">再設定が完了しました</h3>
+        </div>
+        <button class="btn btn-primary" id="toLoginFromResetDone">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main App Section -->
+<div id="appSection" style="display:none;">
+  <nav class="navbar">
+    <div class="navbar-brand">SNS <span class="full">- Shibaura Network Service</span></div>
+    <div class="navbar-nav">
+      <button class="nav-btn active" data-page="timeline" id="navTimeline">🏠 ホーム</button>
+      <button class="nav-btn" data-page="search" id="navSearch">🔍 検索</button>
+      <button class="nav-btn" data-page="messages" id="navMessages">💬 DM <span class="badge" id="msgBadge" style="display:none"></span></button>
+      <button class="nav-btn" data-page="notifications" id="navNotifs">🔔 通知 <span class="badge" id="notifBadge" style="display:none"></span></button>
+      <button class="nav-btn" data-page="myprofile" id="navProfile">👤 マイページ</button>
+      <button class="nav-btn" id="logoutBtn">ログアウト</button>
+    </div>
+  </nav>
+
+  <div class="main-content">
+
+    <!-- Timeline Page -->
+    <div id="pageTimeline" class="page active">
+      <div class="post-form-card">
+        <textarea id="postContent" placeholder="いまどうしてる？"></textarea>
+        <div class="post-form-footer">
+          <span class="char-count" id="postCharCount">0 / 340文字</span>
+          <button class="btn btn-primary btn-sm" id="postSubmitBtn">投稿</button>
+        </div>
+        <div id="postError" class="error-msg"></div>
+      </div>
+      <div id="timelineList">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div id="timelineEmpty" class="empty-state" style="display:none;">まだ投稿がありません</div>
+    </div>
+
+    <!-- Post Detail Page -->
+    <div id="pagePostDetail" class="page">
+      <div class="detail-back">
+        <button class="btn btn-secondary btn-sm" id="backToTimeline">← タイムラインに戻る</button>
+      </div>
+      <div id="detailContent"></div>
+    </div>
+
+    <!-- Search Page -->
+    <div id="pageSearch" class="page">
+      <div class="search-form">
+        <h3 style="margin-bottom:16px;">ユーザー検索</h3>
+        <div class="search-grid">
+          <div class="form-group">
+            <label>名前</label>
+            <input type="text" id="searchName" placeholder="氏名で検索">
+          </div>
+          <div class="form-group">
+            <label>学年</label>
+            <select id="searchGrade">
+              <option value="">すべて</option>
+              <option value="1">学部1年</option>
+              <option value="2">学部2年</option>
+              <option value="3">学部3年</option>
+              <option value="4">学部4年</option>
+              <option value="5">修士1年</option>
+              <option value="6">修士2年</option>
+              <option value="7">博士1年</option>
+              <option value="8">博士2年</option>
+              <option value="9">博士3年</option>
+              <option value="10">博士4年</option>
+              <option value="11">教員</option>
+              <option value="0">職員</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>学部</label>
+            <select id="searchFaculty" onchange="onSearchFacultyChange()">
+              <option value="">すべて</option>
+              <option value="工学部">工学部</option>
+              <option value="システム理工学部">システム理工学部</option>
+              <option value="デザイン工学部">デザイン工学部</option>
+              <option value="建築学部">建築学部</option>
+              <option value="大学院 理工学研究科">大学院 理工学研究科</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>コース</label>
+            <select id="searchCourse" onchange="onSearchCourseChange()">
+              <option value="">すべて</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px;">
+          <label>研究室</label>
+          <div class="lab-search-wrapper">
+            <input type="text" id="searchLab" placeholder="研究室名または教員名" autocomplete="off"
+              oninput="onSearchLabInput()" onfocus="onSearchLabInput()">
+            <div id="labSearchDropdown" class="lab-dropdown" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="search-grid" style="margin-top:12px;">
+          <div class="form-group">
+            <label>サークル・部活</label>
+            <input type="text" id="searchClubs" placeholder="サークル名">
+          </div>
+        </div>
+        <button class="btn btn-primary" id="searchBtn" style="margin-top:16px;">検索</button>
+      </div>
+      <div id="searchResults"></div>
+    </div>
+
+    <!-- Messages Page (partner list) -->
+    <div id="pageMessages" class="page">
+      <h3 style="margin-bottom:16px;">メッセージ</h3>
+      <div id="partnerList">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div id="partnerEmpty" class="empty-state" style="display:none;">メッセージのやり取りがあるユーザーはいません</div>
+    </div>
+
+    <!-- Chat Page -->
+    <div id="pageChat" class="page">
+      <div class="detail-back">
+        <button class="btn btn-secondary btn-sm" id="backToMessages">← メッセージ一覧に戻る</button>
+      </div>
+      <div class="chat-container">
+        <div class="chat-header">
+          <div class="avatar sm" id="chatPartnerAvatar"></div>
+          <span id="chatPartnerName" style="font-weight:600;"></span>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-area">
+          <input type="text" id="chatInput" placeholder="メッセージを入力..." maxlength="85">
+          <button class="btn btn-primary btn-sm" id="chatSendBtn">送信</button>
+        </div>
+        <div id="chatError" class="error-msg" style="margin:8px 16px;"></div>
+      </div>
+    </div>
+
+    <!-- Notifications Page -->
+    <div id="pageNotifications" class="page">
+      <h3 style="margin-bottom:16px;">通知</h3>
+      <div id="notifList">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div id="notifEmpty" class="empty-state" style="display:none;">通知はありません</div>
+    </div>
+
+    <!-- My Profile Page -->
+    <div id="pageMyprofile" class="page">
+      <div id="myProfileContent">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Other Profile Page -->
+    <div id="pageOtherProfile" class="page">
+      <div class="detail-back">
+        <button class="btn btn-secondary btn-sm" id="backFromOtherProfile">← 戻る</button>
+      </div>
+      <div id="otherProfileContent"></div>
+    </div>
+
+    <!-- Edit Profile Page -->
+    <div id="pageEditProfile" class="page">
+      <div class="detail-back">
+        <button class="btn btn-secondary btn-sm" id="backFromEditProfile">← 戻る</button>
+      </div>
+      <div class="profile-card">
+        <h3 style="margin-bottom:16px;">プロフィール編集</h3>
+        <form id="editProfileForm">
+          <div class="form-group">
+            <label>氏名 <span style="color:red">*</span></label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="editLastName" placeholder="芝浦" maxlength="16" style="flex:1;" required>
+              <input type="text" id="editFirstName" placeholder="太郎" maxlength="16" style="flex:1;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>学年/職員/教員</label>
+            <select id="editGrade" onchange="onGradeChange('edit')">
+              <option value="1">学部1年</option>
+              <option value="2">学部2年</option>
+              <option value="3">学部3年</option>
+              <option value="4">学部4年</option>
+              <option value="5">修士1年</option>
+              <option value="6">修士2年</option>
+              <option value="7">博士1年</option>
+              <option value="8">博士2年</option>
+              <option value="9">博士3年</option>
+              <option value="10">博士4年</option>
+              <option value="11">教員</option>
+              <option value="0">職員</option>
+            </select>
+          </div>
+          <div class="form-group" id="editFacultyGroup" style="display:none;">
+            <label>所属</label>
+            <select id="editFaculty" onchange="onFacultyChange('edit')">
+              <option value="">選択してください</option>
+              <option value="工学部">工学部</option>
+              <option value="システム理工学部">システム理工学部</option>
+              <option value="デザイン工学部">デザイン工学部</option>
+              <option value="建築学部">建築学部</option>
+              <option value="大学院 理工学研究科" style="display:none;">大学院 理工学研究科</option>
+            </select>
+          </div>
+          <div class="form-group" id="editGradGroup" style="display:none;">
+            <label>所属</label>
+            <div class="static-field">大学院 理工学研究科</div>
+          </div>
+          <div class="form-group" id="editGradCourseGroup" style="display:none;">
+            <label>専攻</label>
+            <select id="editGradCourseSelect">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group" id="editStaffGroup" style="display:none;">
+            <label>所属</label>
+            <input type="text" id="editStaffDept" placeholder="学生課">
+          </div>
+          <div class="form-group" id="editCourseGroup" style="display:none;">
+            <label>課程・コース/学科</label>
+            <select id="editCourseSelect" onchange="onCourseChange('edit')">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group" id="editSubCourseGroup" style="display:none;">
+            <label>コース</label>
+            <select id="editSubCourseSelect">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group" id="editProgramGroup" style="display:none;">
+            <label>プログラム</label>
+            <select id="editProgram">
+              <option value="一般プログラム">一般プログラム</option>
+              <option value="国際プログラム">国際プログラム</option>
+            </select>
+          </div>
+          <div class="form-group" id="editLabGroup" style="display:none;">
+            <label>研究室</label>
+            <select id="editLabSelect" onchange="onLabSelectChange('edit')">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group" id="editLabOtherGroup" style="display:none;">
+            <label>研究室（自由入力）</label>
+            <input type="text" id="editLabOther" placeholder="○○研究室(教員名)">
+          </div>
+          <div class="form-group">
+            <label>サークル・部活動</label>
+            <input type="text" id="editClubs">
+          </div>
+          <div class="form-group">
+            <label>自己紹介</label>
+            <textarea id="editBio"></textarea>
+          </div>
+          <div class="form-group">
+            <label>時間割</label>
+            <textarea id="editTimetable" placeholder="月曜1限:○○..."></textarea>
+          </div>
+          <div id="editProfileError" class="error-msg"></div>
+          <div style="display:flex;gap:8px;">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <button type="button" class="btn btn-secondary" id="cancelEditProfile">キャンセル</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- end main-content -->
+</div><!-- end appSection -->
+
+<!-- Error Dialog -->
+<div class="dialog-overlay" id="errorDialog" style="display:none;">
+  <div class="dialog-box">
+    <h3>エラー</h3>
+    <p id="errorDialogMsg"></p>
+    <div class="dialog-actions">
+      <button class="btn btn-primary" id="errorDialogOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
