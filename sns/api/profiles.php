@@ -84,6 +84,12 @@ function searchProfiles(int $loginUserId): void {
         $params[':clubs'] = '%' . $clubs . '%';
     }
 
+    $lab = trim($_GET['lab'] ?? '');
+    if ($lab !== '') {
+        $conditions[] = 'pr.lab LIKE :lab';
+        $params[':lab'] = '%' . $lab . '%';
+    }
+
     $where = implode(' AND ', $conditions);
     $stmt = $db->prepare("
         SELECT pr.user_id, pr.name, pr.icon_id, pr.grade, pr.department, pr.course, pr.bio

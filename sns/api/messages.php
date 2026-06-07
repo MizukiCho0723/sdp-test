@@ -78,27 +78,45 @@ function getHistory(int $userId): void {
 
 function getPartners(int $userId): void {
     $db = getDB();
+
+    // 会話相手のIDを取得
     $stmt = $db->prepare('
-        SELECT DISTINCT
-            CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS partner_id,
-            pr.name, pr.icon_id,
-            (SELECT content FROM messages
-             WHERE (sender_id = ? AND receiver_id = partner_id)
-                OR (sender_id = partner_id AND receiver_id = ?)
-             ORDER BY sent_at DESC LIMIT 1) AS last_message,
-            (SELECT sent_at FROM messages
-             WHERE (sender_id = ? AND receiver_id = partner_id)
-                OR (sender_id = partner_id AND receiver_id = ?)
-             ORDER BY sent_at DESC LIMIT 1) AS last_at,
-            (SELECT COUNT(*) FROM messages
-             WHERE sender_id = partner_id AND receiver_id = ? AND is_read = 0) AS unread_count
-        FROM messages m
-        JOIN profiles pr ON pr.user_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END
-        WHERE m.sender_id = ? OR m.receiver_id = ?
-        ORDER BY last_at DESC
+        SELECT DISTINCT CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id
+        FROM messages WHERE sender_id = ? OR receiver_id = ?
     ');
-    $stmt->execute([$userId, $userId, $userId, $userId, $userId, $userId, $userId, $userId, $userId]);
-    $partners = $stmt->fetchAll();
+    $stmt->execute([$userId, $userId, $userId]);
+    $partnerIds = array_column($stmt->fetchAll(), 'partner_id');
+
+    $partners = [];
+    foreach ($partnerIds as $pid) {
+        $pr = $db->prepare('SELECT name, icon_id FROM profiles WHERE user_id = ?');
+        $pr->execute([$pid]);
+        $profile = $pr->fetch();
+        if (!$profile) continue;
+
+        $lm = $db->prepare('
+            SELECT content, sent_at FROM messages
+            WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+            ORDER BY sent_at DESC LIMIT 1
+        ');
+        $lm->execute([$userId, $pid, $pid, $userId]);
+        $lastMsg = $lm->fetch();
+
+        $ur = $db->prepare('SELECT COUNT(*) FROM messages WHERE sender_id = ? AND receiver_id = ? AND is_read = 0');
+        $ur->execute([$pid, $userId]);
+        $unread = (int)$ur->fetchColumn();
+
+        $partners[] = [
+            'partner_id' => $pid,
+            'name' => $profile['name'],
+            'icon_id' => $profile['icon_id'],
+            'last_message' => $lastMsg['content'] ?? '',
+            'last_at' => $lastMsg['sent_at'] ?? '',
+            'unread_count' => $unread,
+        ];
+    }
+
+    usort($partners, fn($a, $b) => strcmp($b['last_at'], $a['last_at']));
     jsonOk(['partners' => $partners]);
 }
 

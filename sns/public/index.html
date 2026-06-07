@@ -78,36 +78,85 @@
       <div id="regStep3" style="display:none;">
         <div class="form-group">
           <label>氏名 <span style="color:red">*</span></label>
-          <input type="text" id="regName" placeholder="芝浦 太郎" maxlength="32">
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="regLastName" placeholder="芝浦" maxlength="16" style="flex:1;">
+            <input type="text" id="regFirstName" placeholder="太郎" maxlength="16" style="flex:1;">
+          </div>
         </div>
         <div class="form-group">
-          <label>学年/職員 <span style="color:red">*</span></label>
-          <select id="regGrade">
+          <label>学年/職員/教員 <span style="color:red">*</span></label>
+          <select id="regGrade" onchange="onGradeChange('reg')">
             <option value="">選択してください</option>
-            <option value="0">教員・職員</option>
             <option value="1">学部1年</option>
             <option value="2">学部2年</option>
             <option value="3">学部3年</option>
             <option value="4">学部4年</option>
             <option value="5">修士1年</option>
             <option value="6">修士2年</option>
-            <option value="7">博士課程</option>
+            <option value="7">博士1年</option>
+            <option value="8">博士2年</option>
+            <option value="9">博士3年</option>
+            <option value="10">博士4年</option>
+            <option value="11">教員</option>
+            <option value="0">職員</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>学部</label>
-          <input type="text" id="regDepartment" placeholder="工学部">
+        <div class="form-group" id="regFacultyGroup" style="display:none;">
+          <label>所属</label>
+          <select id="regFaculty" onchange="onFacultyChange('reg')">
+            <option value="">選択してください</option>
+            <option value="工学部">工学部</option>
+            <option value="システム理工学部">システム理工学部</option>
+            <option value="デザイン工学部">デザイン工学部</option>
+            <option value="建築学部">建築学部</option>
+            <option value="大学院 理工学研究科" style="display:none;">大学院 理工学研究科</option>
+          </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="regGradGroup" style="display:none;">
+          <label>所属</label>
+          <div class="static-field">大学院 理工学研究科</div>
+        </div>
+        <div class="form-group" id="regGradCourseGroup" style="display:none;">
+          <label>専攻</label>
+          <select id="regGradCourseSelect">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-group" id="regStaffGroup" style="display:none;">
+          <label>所属</label>
+          <input type="text" id="regStaffDept" placeholder="学生課">
+        </div>
+        <div class="form-group" id="regCourseGroup" style="display:none;">
+          <label>課程・コース/学科</label>
+          <select id="regCourseSelect" onchange="onCourseChange('reg')">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-group" id="regSubCourseGroup" style="display:none;">
           <label>コース</label>
-          <input type="text" id="regCourse" placeholder="情報工学コース">
+          <select id="regSubCourseSelect">
+            <option value="">選択してください</option>
+          </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="regProgramGroup" style="display:none;">
+          <label>プログラム</label>
+          <select id="regProgram">
+            <option value="一般プログラム">一般プログラム</option>
+            <option value="国際プログラム">国際プログラム</option>
+          </select>
+        </div>
+        <div class="form-group" id="regLabGroup" style="display:none;">
           <label>研究室</label>
-          <input type="text" id="regLab" placeholder="○○研究室">
+          <select id="regLabSelect" onchange="onLabSelectChange('reg')">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-group" id="regLabOtherGroup" style="display:none;">
+          <label>研究室（自由入力）</label>
+          <input type="text" id="regLabOther" placeholder="○○研究室(教員名)">
         </div>
         <div class="form-group">
-          <label>サークル・部活</label>
+          <label>サークル・部活動</label>
           <input type="text" id="regClubs" placeholder="△△部">
         </div>
         <div class="form-group">
@@ -229,25 +278,53 @@
             <label>学年</label>
             <select id="searchGrade">
               <option value="">すべて</option>
-              <option value="0">教員・職員</option>
               <option value="1">学部1年</option>
               <option value="2">学部2年</option>
               <option value="3">学部3年</option>
               <option value="4">学部4年</option>
               <option value="5">修士1年</option>
               <option value="6">修士2年</option>
+              <option value="7">博士1年</option>
+              <option value="8">博士2年</option>
+              <option value="9">博士3年</option>
+              <option value="10">博士4年</option>
+              <option value="11">教員</option>
+              <option value="0">職員</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>学部</label>
+            <select id="searchFaculty" onchange="onSearchFacultyChange()">
+              <option value="">すべて</option>
+              <option value="工学部">工学部</option>
+              <option value="システム理工学部">システム理工学部</option>
+              <option value="デザイン工学部">デザイン工学部</option>
+              <option value="建築学部">建築学部</option>
+              <option value="大学院 理工学研究科">大学院 理工学研究科</option>
             </select>
           </div>
           <div class="form-group">
             <label>コース</label>
-            <input type="text" id="searchCourse" placeholder="コース名">
+            <select id="searchCourse" onchange="onSearchCourseChange()">
+              <option value="">すべて</option>
+            </select>
           </div>
+        </div>
+        <div class="form-group" style="margin-top:12px;">
+          <label>研究室</label>
+          <div class="lab-search-wrapper">
+            <input type="text" id="searchLab" placeholder="研究室名または教員名" autocomplete="off"
+              oninput="onSearchLabInput()" onfocus="onSearchLabInput()">
+            <div id="labSearchDropdown" class="lab-dropdown" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="search-grid" style="margin-top:12px;">
           <div class="form-group">
             <label>サークル・部活</label>
             <input type="text" id="searchClubs" placeholder="サークル名">
           </div>
         </div>
-        <button class="btn btn-primary" id="searchBtn">検索</button>
+        <button class="btn btn-primary" id="searchBtn" style="margin-top:16px;">検索</button>
       </div>
       <div id="searchResults"></div>
     </div>
@@ -290,7 +367,7 @@
     </div>
 
     <!-- My Profile Page -->
-    <div id="pageMyProfile" class="page">
+    <div id="pageMyprofile" class="page">
       <div id="myProfileContent">
         <div class="loading"><div class="spinner"></div></div>
       </div>
@@ -314,35 +391,84 @@
         <form id="editProfileForm">
           <div class="form-group">
             <label>氏名 <span style="color:red">*</span></label>
-            <input type="text" id="editName" required>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="editLastName" placeholder="芝浦" maxlength="16" style="flex:1;" required>
+              <input type="text" id="editFirstName" placeholder="太郎" maxlength="16" style="flex:1;">
+            </div>
           </div>
           <div class="form-group">
-            <label>学年/職員</label>
-            <select id="editGrade">
-              <option value="0">教員・職員</option>
+            <label>学年/職員/教員</label>
+            <select id="editGrade" onchange="onGradeChange('edit')">
               <option value="1">学部1年</option>
               <option value="2">学部2年</option>
               <option value="3">学部3年</option>
               <option value="4">学部4年</option>
               <option value="5">修士1年</option>
               <option value="6">修士2年</option>
-              <option value="7">博士課程</option>
+              <option value="7">博士1年</option>
+              <option value="8">博士2年</option>
+              <option value="9">博士3年</option>
+              <option value="10">博士4年</option>
+              <option value="11">教員</option>
+              <option value="0">職員</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>学部</label>
-            <input type="text" id="editDepartment">
+          <div class="form-group" id="editFacultyGroup" style="display:none;">
+            <label>所属</label>
+            <select id="editFaculty" onchange="onFacultyChange('edit')">
+              <option value="">選択してください</option>
+              <option value="工学部">工学部</option>
+              <option value="システム理工学部">システム理工学部</option>
+              <option value="デザイン工学部">デザイン工学部</option>
+              <option value="建築学部">建築学部</option>
+              <option value="大学院 理工学研究科" style="display:none;">大学院 理工学研究科</option>
+            </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="editGradGroup" style="display:none;">
+            <label>所属</label>
+            <div class="static-field">大学院 理工学研究科</div>
+          </div>
+          <div class="form-group" id="editGradCourseGroup" style="display:none;">
+            <label>専攻</label>
+            <select id="editGradCourseSelect">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group" id="editStaffGroup" style="display:none;">
+            <label>所属</label>
+            <input type="text" id="editStaffDept" placeholder="学生課">
+          </div>
+          <div class="form-group" id="editCourseGroup" style="display:none;">
+            <label>課程・コース/学科</label>
+            <select id="editCourseSelect" onchange="onCourseChange('edit')">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group" id="editSubCourseGroup" style="display:none;">
             <label>コース</label>
-            <input type="text" id="editCourse">
+            <select id="editSubCourseSelect">
+              <option value="">選択してください</option>
+            </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="editProgramGroup" style="display:none;">
+            <label>プログラム</label>
+            <select id="editProgram">
+              <option value="一般プログラム">一般プログラム</option>
+              <option value="国際プログラム">国際プログラム</option>
+            </select>
+          </div>
+          <div class="form-group" id="editLabGroup" style="display:none;">
             <label>研究室</label>
-            <input type="text" id="editLab">
+            <select id="editLabSelect" onchange="onLabSelectChange('edit')">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group" id="editLabOtherGroup" style="display:none;">
+            <label>研究室（自由入力）</label>
+            <input type="text" id="editLabOther" placeholder="○○研究室(教員名)">
           </div>
           <div class="form-group">
-            <label>サークル・部活</label>
+            <label>サークル・部活動</label>
             <input type="text" id="editClubs">
           </div>
           <div class="form-group">

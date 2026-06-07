@@ -1,5 +1,6 @@
 <?php
 define('DB_PATH', '/var/www/sns_data/db/OrderManage.db');
+date_default_timezone_set('Asia/Tokyo');
 define('DOMAIN', 'shibaura-it.ac.jp');
 define('SESSION_LIFETIME', 3600);
 

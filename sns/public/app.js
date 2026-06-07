@@ -1,10 +1,10 @@
 // SNS App - Main JavaScript
 const API = {
-  auth: '/sns/api/auth.php',
-  posts: '/sns/api/posts.php',
-  messages: '/sns/api/messages.php',
-  profiles: '/sns/api/profiles.php',
-  notifications: '/sns/api/notifications.php',
+  auth: '/api/auth.php',
+  posts: '/api/posts.php',
+  messages: '/api/messages.php',
+  profiles: '/api/profiles.php',
+  notifications: '/api/notifications.php',
 };
 
 let currentUserId = null;
@@ -46,8 +46,435 @@ function clearFieldError(elId) {
 }
 
 function gradeLabel(g) {
-  const map = { 0: '教員・職員', 1: '学部1年', 2: '学部2年', 3: '学部3年', 4: '学部4年', 5: '修士1年', 6: '修士2年', 7: '博士課程' };
+  const map = { 0: '職員', 1: '学部1年', 2: '学部2年', 3: '学部3年', 4: '学部4年', 5: '修士1年', 6: '修士2年', 7: '博士1年', 8: '博士2年', 9: '博士3年', 10: '博士4年', 11: '教員' };
   return map[g] || '不明';
+}
+
+// ---- 所属カスケード ----
+// 配列 = フラット選択（工学部）、オブジェクト = 課程→コースの2段階
+const SHOZOKU_COURSES = {
+  '工学部': [
+    '機械工学課程 基幹機械コース(機械工学科)',
+    '機械工学課程 先進機械コース(機械機能工学科)',
+    '物質化学課程 環境・物質工学コース(材料工学科)',
+    '物質化学課程 化学・生命コース(応用化学科)',
+    '電気電子工学課程 電気・ロボット工学コース(電気工学科)',
+    '電気電子工学課程 先端電子工学コース(電子工学科)',
+    '情報・通信工学課程 情報通信コース(情報通信工学科)',
+    '情報・通信工学課程 情報工学コース(情報工学科)',
+    '土木工学課程 都市・環境コース(土木工学科)',
+    '先進国際課程',
+  ],
+  'システム理工学部': {
+    '情報課程(電子情報システム学科)': ['IoTコース', 'ソフトウェアコース', 'メディアコース', 'データサイエンスコース'],
+    '機械・電気課程(機械制御システム学科)': ['機械・電気コース'],
+    '建築・環境課程(環境システム学科)': ['建築コース', '環境・都市コース'],
+    '生命科学課程(生命科学科)': ['生命科学コース', '医工学コース', 'スポーツ工学コース'],
+    '数理科学課程(数理科学科)': ['数理科学コース'],
+  },
+  'デザイン工学部': {
+    'デザイン工学科': ['社会情報システムコース', 'UXコース', 'プロダクトコース', '生産・プロダクトデザイン系', 'ロボティクス・情報デザイン系'],
+  },
+  '建築学部': {
+    '建築学科': ['SAコース', 'UAコース', 'APコース'],
+  },
+  '大学院 理工学研究科': [
+    '電気電子情報工学専攻',
+    '材料工学専攻',
+    '応用化学専攻',
+    '機械工学専攻',
+    'システム理工学専攻',
+    '国際理工学専攻',
+    '社会基盤学専攻',
+    '建築学専攻',
+    '地域環境システム専攻',
+    '機能制御システム専攻',
+  ],
+};
+
+const GRAD_COURSES = {
+  masters: [
+    '電気電子情報工学専攻',
+    '材料工学専攻',
+    '応用化学専攻',
+    '機械工学専攻',
+    'システム理工学専攻',
+    '国際理工学専攻',
+    '社会基盤学専攻',
+    '建築学専攻',
+  ],
+  doctoral: [
+    '地域環境システム専攻',
+    '機能制御システム専攻',
+  ],
+};
+
+// ---- 研究室データ（コースキー → 研究室リスト） ----
+const LAB_DATA = {
+  '機械工学課程 基幹機械コース(機械工学科)': [
+    '生産加工プロセス研究室(青木 孝史朗)',
+    '機械制御工学研究室(内村 裕)',
+    '燃焼工学研究室(斎藤 寛泰)',
+    '粒状体力学研究室(佐伯 暢人)',
+    '固体力学研究室(坂上 賢一)',
+    '臨床機械加工研究室(澤 武一)',
+    '熱流体理工学研究室(白井 克明)',
+    '応用伝熱工学研究室(丹下 学)',
+    'エネルギー変換工学研究室(角田 和巳)',
+    '離散数学研究室(西村 強)',
+    '材料強度学研究室(橋村 真治)',
+    '生物微小流体工学研究室(二井 信行)',
+    '熱工学研究室(矢作 裕司)',
+    '科学技術と社会研究室(栃内 文彦)',
+  ],
+  '機械工学課程 先進機械コース(機械機能工学科)': [],
+  '物質化学課程 環境・物質工学コース(材料工学科)': [],
+  '物質化学課程 化学・生命コース(応用化学科)': [],
+  '電気電子工学課程 電気・ロボット工学コース(電気工学科)': [],
+  '電気電子工学課程 先端電子工学コース(電子工学科)': [],
+  '情報・通信工学課程 情報通信コース(情報通信工学科)': [],
+  '情報・通信工学課程 情報工学コース(情報工学科)': [],
+  '土木工学課程 都市・環境コース(土木工学科)': [],
+  '先進国際課程': [],
+  '情報課程(電子情報システム学科) - IoTコース': [],
+  '情報課程(電子情報システム学科) - ソフトウェアコース': [],
+  '情報課程(電子情報システム学科) - メディアコース': [],
+  '情報課程(電子情報システム学科) - データサイエンスコース': [],
+  '機械・電気課程(機械制御システム学科) - 機械・電気コース': [],
+  '建築・環境課程(環境システム学科) - 建築コース': [],
+  '建築・環境課程(環境システム学科) - 環境・都市コース': [],
+  '生命科学課程(生命科学科) - 生命科学コース': [],
+  '生命科学課程(生命科学科) - 医工学コース': [],
+  '生命科学課程(生命科学科) - スポーツ工学コース': [],
+  '数理科学課程(数理科学科) - 数理科学コース': [],
+  'デザイン工学科 - 社会情報システムコース': [],
+  'デザイン工学科 - UXコース': [],
+  'デザイン工学科 - プロダクトコース': [],
+  'デザイン工学科 - 生産・プロダクトデザイン系': [],
+  'デザイン工学科 - ロボティクス・情報デザイン系': [],
+  '建築学科 - SAコース': [],
+  '建築学科 - UAコース': [],
+  '建築学科 - APコース': [],
+};
+
+function getAllLabsForFaculty(faculty) {
+  const courseData = SHOZOKU_COURSES[faculty];
+  if (!courseData) return [];
+  const keys = Array.isArray(courseData) ? courseData
+    : Object.entries(courseData).flatMap(([dept, courses]) => courses.map(c => dept + ' - ' + c));
+  return keys.flatMap(k => LAB_DATA[k] || []);
+}
+
+function getCourseKeyForLab(labValue) {
+  for (const [key, labs] of Object.entries(LAB_DATA)) {
+    if (labs.includes(labValue)) return key;
+  }
+  return null;
+}
+
+function getFacultyForCourseKey(courseKey) {
+  for (const [faculty, courseData] of Object.entries(SHOZOKU_COURSES)) {
+    if (Array.isArray(courseData)) {
+      if (courseData.includes(courseKey)) return faculty;
+    } else {
+      for (const [dept, courses] of Object.entries(courseData)) {
+        if (courses.some(c => dept + ' - ' + c === courseKey)) return faculty;
+      }
+    }
+  }
+  return null;
+}
+
+function getCurrentCourseKey(pfx) {
+  const faculty = document.getElementById(pfx + 'Faculty')?.value || '';
+  if (!faculty) return null;
+  const courseData = SHOZOKU_COURSES[faculty];
+  if (!courseData) return null;
+  const courseVal = document.getElementById(pfx + 'CourseSelect')?.value || '';
+  if (!courseVal) return null;
+  if (Array.isArray(courseData)) return courseVal;
+  const subCourse = document.getElementById(pfx + 'SubCourseSelect')?.value || '';
+  if (subCourse) return courseVal + ' - ' + subCourse;
+  if (courseData[courseVal]?.length === 1) return courseVal + ' - ' + courseData[courseVal][0];
+  return null;
+}
+
+function updateLabSelect(pfx) {
+  const courseKey = getCurrentCourseKey(pfx);
+  const faculty = document.getElementById(pfx + 'Faculty')?.value || '';
+  const labs = courseKey ? (LAB_DATA[courseKey] || []) : [];
+  const group = document.getElementById(pfx + 'LabGroup');
+  const sel = document.getElementById(pfx + 'LabSelect');
+  const otherGroup = document.getElementById(pfx + 'LabOtherGroup');
+  if (!group) return;
+  if (labs.length > 0) {
+    sel.innerHTML = '<option value="">選択してください</option>' +
+      labs.map(l => `<option value="${l}">${l}</option>`).join('') +
+      '<option value="__other__">その他（自由入力）</option>';
+    group.style.display = 'block';
+    otherGroup.style.display = 'none';
+  } else if (faculty) {
+    group.style.display = 'none';
+    otherGroup.style.display = 'block';
+  } else {
+    group.style.display = 'none';
+    otherGroup.style.display = 'none';
+  }
+}
+
+function onLabSelectChange(pfx) {
+  const val = document.getElementById(pfx + 'LabSelect').value;
+  document.getElementById(pfx + 'LabOtherGroup').style.display = val === '__other__' ? 'block' : 'none';
+}
+
+function getLabValue(pfx) {
+  const group = document.getElementById(pfx + 'LabGroup');
+  if (group && group.style.display !== 'none') {
+    const val = document.getElementById(pfx + 'LabSelect').value;
+    if (val === '__other__') return document.getElementById(pfx + 'LabOther').value;
+    return val;
+  }
+  return document.getElementById(pfx + 'LabOther')?.value || '';
+}
+
+function setLabValue(pfx, labValue) {
+  const group = document.getElementById(pfx + 'LabGroup');
+  const sel = document.getElementById(pfx + 'LabSelect');
+  if (group && group.style.display !== 'none' && sel) {
+    const exists = Array.from(sel.options).some(o => o.value === labValue);
+    if (exists) { sel.value = labValue; return; }
+    if (labValue) {
+      sel.value = '__other__';
+      document.getElementById(pfx + 'LabOtherGroup').style.display = 'block';
+      document.getElementById(pfx + 'LabOther').value = labValue;
+    }
+  } else if (labValue) {
+    const otherGroup = document.getElementById(pfx + 'LabOtherGroup');
+    if (otherGroup) {
+      otherGroup.style.display = 'block';
+      document.getElementById(pfx + 'LabOther').value = labValue;
+    }
+  }
+}
+
+// ---- 検索フォーム 研究室オートコンプリート ----
+function getSearchLabOptions() {
+  const faculty = document.getElementById('searchFaculty').value;
+  const course = document.getElementById('searchCourse').value;
+  const query = document.getElementById('searchLab').value.toLowerCase();
+  let labs = [];
+  if (course) {
+    labs = LAB_DATA[course] || [];
+  } else if (faculty) {
+    labs = getAllLabsForFaculty(faculty);
+  } else {
+    labs = Object.values(LAB_DATA).flat();
+  }
+  if (query) labs = labs.filter(l => l.toLowerCase().includes(query));
+  return [...new Set(labs)];
+}
+
+function renderLabDropdown() {
+  const labs = getSearchLabOptions();
+  const dropdown = document.getElementById('labSearchDropdown');
+  if (labs.length === 0) { dropdown.style.display = 'none'; return; }
+  dropdown.innerHTML = labs.map(l =>
+    `<div class="lab-dropdown-item" onmousedown="selectSearchLab(${JSON.stringify(l)})">${l}</div>`
+  ).join('');
+  dropdown.style.display = 'block';
+}
+
+function onSearchLabInput() { renderLabDropdown(); }
+
+function selectSearchLab(labValue) {
+  document.getElementById('searchLab').value = labValue;
+  document.getElementById('labSearchDropdown').style.display = 'none';
+  const courseKey = getCourseKeyForLab(labValue);
+  if (courseKey) {
+    const faculty = getFacultyForCourseKey(courseKey);
+    if (faculty) {
+      document.getElementById('searchFaculty').value = faculty;
+      onSearchFacultyChange();
+      document.getElementById('searchCourse').value = courseKey;
+    }
+  }
+}
+
+function onSearchFacultyChange() {
+  const faculty = document.getElementById('searchFaculty').value;
+  const courseData = SHOZOKU_COURSES[faculty];
+  const sel = document.getElementById('searchCourse');
+  sel.innerHTML = '<option value="">すべて</option>';
+  if (courseData) {
+    if (Array.isArray(courseData)) {
+      courseData.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.textContent = opt; sel.appendChild(o); });
+    } else {
+      Object.entries(courseData).forEach(([dept, courses]) => {
+        courses.forEach(course => {
+          const o = document.createElement('option');
+          o.value = dept + ' - ' + course;
+          o.textContent = dept + ' - ' + course;
+          sel.appendChild(o);
+        });
+      });
+    }
+  }
+  renderLabDropdown();
+}
+
+function onSearchCourseChange() { renderLabDropdown(); }
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.lab-search-wrapper')) {
+    const dd = document.getElementById('labSearchDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+function getGradeCat(grade) {
+  const g = parseInt(grade);
+  if ([1,2,3,4,11].includes(g)) return 'faculty';
+  if ([5,6].includes(g)) return 'masters';
+  if ([7,8,9,10].includes(g)) return 'doctoral';
+  if (g === 0) return 'staff';
+  return null;
+}
+
+function onGradeChange(pfx) {
+  const grade = document.getElementById(pfx + 'Grade').value;
+  const cat = getGradeCat(grade);
+  const isGrad = cat === 'masters' || cat === 'doctoral';
+  document.getElementById(pfx + 'FacultyGroup').style.display = cat === 'faculty' ? 'block' : 'none';
+  document.getElementById(pfx + 'GradGroup').style.display = isGrad ? 'block' : 'none';
+  document.getElementById(pfx + 'StaffGroup').style.display = cat === 'staff' ? 'block' : 'none';
+  document.getElementById(pfx + 'CourseGroup').style.display = 'none';
+  document.getElementById(pfx + 'SubCourseGroup').style.display = 'none';
+  document.getElementById(pfx + 'ProgramGroup').style.display = 'none';
+  if (isGrad) {
+    const courses = cat === 'masters' ? GRAD_COURSES.masters : GRAD_COURSES.doctoral;
+    const sel = document.getElementById(pfx + 'GradCourseSelect');
+    sel.innerHTML = '<option value="">選択してください</option>' +
+      courses.map(c => `<option value="${c}">${c}</option>`).join('');
+    document.getElementById(pfx + 'GradCourseGroup').style.display = 'block';
+  } else {
+    document.getElementById(pfx + 'GradCourseGroup').style.display = 'none';
+  }
+  const fac = document.getElementById(pfx + 'Faculty');
+  if (fac) {
+    fac.value = '';
+    const gradOpt = fac.querySelector('option[value="大学院 理工学研究科"]');
+    if (gradOpt) gradOpt.style.display = parseInt(grade) === 11 ? '' : 'none';
+  }
+}
+
+function onFacultyChange(pfx) {
+  const faculty = document.getElementById(pfx + 'Faculty').value;
+  const courseData = SHOZOKU_COURSES[faculty];
+  document.getElementById(pfx + 'SubCourseGroup').style.display = 'none';
+  document.getElementById(pfx + 'ProgramGroup').style.display = faculty === 'システム理工学部' ? 'block' : 'none';
+  updateLabSelect(pfx);
+  if (!courseData) { document.getElementById(pfx + 'CourseGroup').style.display = 'none'; return; }
+  const options = Array.isArray(courseData) ? courseData : Object.keys(courseData);
+  const sel = document.getElementById(pfx + 'CourseSelect');
+  sel.innerHTML = '<option value="">選択してください</option>' +
+    options.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById(pfx + 'CourseGroup').style.display = 'block';
+}
+
+function onCourseChange(pfx) {
+  const faculty = document.getElementById(pfx + 'Faculty').value;
+  const courseData = SHOZOKU_COURSES[faculty];
+  const course = document.getElementById(pfx + 'CourseSelect').value;
+  if (!Array.isArray(courseData) && courseData && course) {
+    const subCourses = courseData[course] || [];
+    if (subCourses.length > 1) {
+      const sel = document.getElementById(pfx + 'SubCourseSelect');
+      sel.innerHTML = '<option value="">選択してください</option>' +
+        subCourses.map(c => `<option value="${c}">${c}</option>`).join('');
+      document.getElementById(pfx + 'SubCourseGroup').style.display = 'block';
+      updateLabSelect(pfx);
+      return;
+    }
+  }
+  document.getElementById(pfx + 'SubCourseGroup').style.display = 'none';
+  updateLabSelect(pfx);
+}
+
+function getShozokuValues(pfx) {
+  const grade = parseInt(document.getElementById(pfx + 'Grade').value);
+  const cat = getGradeCat(grade);
+  let department = '', course = '';
+  if (cat === 'faculty') {
+    department = document.getElementById(pfx + 'Faculty').value;
+    const courseData = SHOZOKU_COURSES[department];
+    const courseVal = document.getElementById(pfx + 'CourseSelect').value;
+    if (Array.isArray(courseData)) {
+      course = courseVal;
+    } else {
+      const subCourseEl = document.getElementById(pfx + 'SubCourseSelect');
+      const subCourse = subCourseEl.value;
+      if (subCourse) {
+        course = courseVal + ' - ' + subCourse;
+      } else if (courseVal && courseData) {
+        const subs = courseData[courseVal] || [];
+        course = subs.length === 1 ? courseVal + ' - ' + subs[0] : courseVal;
+      } else {
+        course = courseVal;
+      }
+    }
+    if (department === 'システム理工学部') {
+      const prog = document.getElementById(pfx + 'Program').value;
+      if (prog === '国際プログラム') {
+        course += course ? ' [国際プログラム]' : '[国際プログラム]';
+      }
+    }
+  } else if (cat === 'masters' || cat === 'doctoral') {
+    department = '大学院 理工学研究科';
+    course = document.getElementById(pfx + 'GradCourseSelect').value;
+  } else if (cat === 'staff') {
+    department = document.getElementById(pfx + 'StaffDept').value.trim();
+  }
+  return { department, course };
+}
+
+function setShozokuValues(pfx, department, course, grade) {
+  document.getElementById(pfx + 'Grade').value = grade;
+  onGradeChange(pfx);
+  const cat = getGradeCat(grade);
+  if (cat === 'faculty') {
+    const knownFaculties = ['工学部', 'システム理工学部', 'デザイン工学部', '建築学部'];
+    if (knownFaculties.includes(department)) {
+      document.getElementById(pfx + 'Faculty').value = department;
+      onFacultyChange(pfx);
+      let courseVal = course || '';
+      let isIntl = false;
+      if (courseVal.endsWith(' [国際プログラム]')) {
+        courseVal = courseVal.slice(0, -' [国際プログラム]'.length);
+        isIntl = true;
+      }
+      const courseData = SHOZOKU_COURSES[department];
+      if (Array.isArray(courseData)) {
+        document.getElementById(pfx + 'CourseSelect').value = courseVal;
+      } else {
+        const dashIdx = courseVal.indexOf(' - ');
+        if (dashIdx !== -1) {
+          const cp = courseVal.substring(0, dashIdx);
+          const sp = courseVal.substring(dashIdx + 3);
+          document.getElementById(pfx + 'CourseSelect').value = cp;
+          onCourseChange(pfx);
+          document.getElementById(pfx + 'SubCourseSelect').value = sp;
+        } else {
+          document.getElementById(pfx + 'CourseSelect').value = courseVal;
+        }
+      }
+      const prog = document.getElementById(pfx + 'Program');
+      if (prog) prog.value = isIntl ? '国際プログラム' : '一般プログラム';
+    }
+  } else if (cat === 'masters' || cat === 'doctoral') {
+    document.getElementById(pfx + 'GradCourseSelect').value = course || '';
+  } else if (cat === 'staff') {
+    document.getElementById(pfx + 'StaffDept').value = department || '';
+  }
 }
 
 function avatarEl(name, cls = '') {
@@ -58,7 +485,7 @@ function avatarEl(name, cls = '') {
 }
 
 function timeAgo(dateStr) {
-  const d = new Date(dateStr);
+  const d = new Date(dateStr.replace(' ', 'T'));
   const diff = (Date.now() - d.getTime()) / 1000;
   if (diff < 60) return 'たった今';
   if (diff < 3600) return `${Math.floor(diff / 60)}分前`;
@@ -175,17 +602,20 @@ document.getElementById('completeRegBtn').onclick = async () => {
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value;
   const confirm = document.getElementById('regPasswordConfirm').value;
-  const name = document.getElementById('regName').value.trim();
+  const lastName = document.getElementById('regLastName').value.trim();
+  const firstName = document.getElementById('regFirstName').value.trim();
+  const name = lastName + (firstName ? ' ' + firstName : '');
   const grade = document.getElementById('regGrade').value;
-  if (!name) { showFieldError('regStep3Error', '氏名を入力してください'); return; }
+  if (!lastName) { showFieldError('regStep3Error', '氏名（名字）を入力してください'); return; }
   if (grade === '') { showFieldError('regStep3Error', '学年/職員欄を選択してください'); return; }
 
+  const { department: regDept, course: regCourse } = getShozokuValues('reg');
   const res = await post(API.auth, {
     action: 'register', email, password, confirm_password: confirm,
     name, grade,
-    department: document.getElementById('regDepartment').value,
-    course: document.getElementById('regCourse').value,
-    lab: document.getElementById('regLab').value,
+    department: regDept,
+    course: regCourse,
+    lab: getLabValue('reg'),
     clubs: document.getElementById('regClubs').value,
     bio: document.getElementById('regBio').value,
   });
@@ -411,9 +841,10 @@ function buildProfileCard(p, isOwn) {
       </div>
       <div class="profile-details">
         ${p.bio ? `<div class="profile-detail-row"><span class="label">自己紹介</span><span>${esc(p.bio)}</span></div>` : ''}
+        ${p.department ? `<div class="profile-detail-row"><span class="label">所属</span><span>${esc(p.department)}</span></div>` : ''}
         ${p.course ? `<div class="profile-detail-row"><span class="label">コース</span><span>${esc(p.course)}</span></div>` : ''}
         ${p.lab ? `<div class="profile-detail-row"><span class="label">研究室</span><span>${esc(p.lab)}</span></div>` : ''}
-        ${p.clubs ? `<div class="profile-detail-row"><span class="label">サークル</span><span>${esc(p.clubs)}</span></div>` : ''}
+        ${p.clubs ? `<div class="profile-detail-row"><span class="label">サークル・部活動</span><span>${esc(p.clubs)}</span></div>` : ''}
         ${p.timetable ? `<div class="profile-detail-row"><span class="label">時間割</span><span>${esc(p.timetable)}</span></div>` : ''}
       </div>
     </div>
@@ -426,11 +857,12 @@ async function loadEditProfile() {
   const res = await get(API.profiles, { action: 'get' });
   if (res.status !== 'ok') { showError('プロフィールの取得に失敗しました'); return; }
   const p = res.profile;
-  document.getElementById('editName').value = p.name || '';
-  document.getElementById('editGrade').value = p.grade || 0;
-  document.getElementById('editDepartment').value = p.department || '';
-  document.getElementById('editCourse').value = p.course || '';
-  document.getElementById('editLab').value = p.lab || '';
+  const nameParts = (p.name || '').split(' ');
+  document.getElementById('editLastName').value = nameParts[0] || '';
+  document.getElementById('editFirstName').value = nameParts.slice(1).join(' ') || '';
+  setShozokuValues('edit', p.department || '', p.course || '', p.grade ?? 1);
+  updateLabSelect('edit');
+  setLabValue('edit', p.lab || '');
   document.getElementById('editClubs').value = p.clubs || '';
   document.getElementById('editBio').value = p.bio || '';
   document.getElementById('editTimetable').value = p.timetable || '';
@@ -439,18 +871,21 @@ async function loadEditProfile() {
 document.getElementById('editProfileForm').onsubmit = async (e) => {
   e.preventDefault();
   clearFieldError('editProfileError');
-  const name = document.getElementById('editName').value.trim();
+  const editLastName = document.getElementById('editLastName').value.trim();
+  const editFirstName = document.getElementById('editFirstName').value.trim();
+  const name = editLastName + (editFirstName ? ' ' + editFirstName : '');
   const bio = document.getElementById('editBio').value.trim();
-  if (!name) { showFieldError('editProfileError', '名前を入力してください（名前は必須項目です）'); return; }
+  if (!editLastName) { showFieldError('editProfileError', '名前（名字）を入力してください'); return; }
   if (new Blob([name]).size > 64) { showFieldError('editProfileError', '名前は64バイト以下にしてください'); return; }
   if (new Blob([bio]).size > 1024) { showFieldError('editProfileError', '自己紹介は1024バイト以下にしてください'); return; }
 
+  const { department: editDept, course: editCourse } = getShozokuValues('edit');
   const res = await post(API.profiles, {
     action: 'update', name,
     grade: document.getElementById('editGrade').value,
-    department: document.getElementById('editDepartment').value,
-    course: document.getElementById('editCourse').value,
-    lab: document.getElementById('editLab').value,
+    department: editDept,
+    course: editCourse,
+    lab: getLabValue('edit'),
     clubs: document.getElementById('editClubs').value,
     bio,
     timetable: document.getElementById('editTimetable').value,
@@ -472,6 +907,7 @@ document.getElementById('searchBtn').onclick = async () => {
     name: document.getElementById('searchName').value,
     grade: document.getElementById('searchGrade').value,
     course: document.getElementById('searchCourse').value,
+    lab: document.getElementById('searchLab').value,
     clubs: document.getElementById('searchClubs').value,
   };
   const res = await get(API.profiles, params);
