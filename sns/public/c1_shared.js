@@ -2,11 +2,11 @@
 // 外部変数(設計書 4章)および各モジュール共通の関数・データ群
 
 const API = {
-  auth: '../api/auth.php',
-  posts: '../api/posts.php',
-  messages: '../api/messages.php',
-  profiles: '../api/profiles.php',
-  notifications: '../api/notifications.php',
+  auth: '/api/auth.php',
+  posts: '/api/posts.php',
+  messages: '/api/messages.php',
+  profiles: '/api/profiles.php',
+  notifications: '/api/notifications.php',
 };
 
 // 外部変数
