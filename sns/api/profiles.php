@@ -23,7 +23,7 @@ function getProfile(int $loginUserId): void {
     $db = getDB();
     $stmt = $db->prepare('
         SELECT pr.*, u.email,
-               TRIM(pr.last_name || ' ' || pr.first_name) AS name,
+               TRIM(pr.last_name || \' \' || pr.first_name) AS name,
                (? = pr.user_id) AS is_own
         FROM profiles pr
         JOIN users u ON pr.user_id = u.user_id

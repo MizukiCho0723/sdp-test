@@ -54,8 +54,8 @@ function getHistory(int $userId): void {
     $db = getDB();
     $stmt = $db->prepare('
         SELECT m.dm_id, m.sender_id, m.receiver_id, m.content, m.sent_at, m.is_read,
-               TRIM(ps.last_name || ' ' || ps.first_name) as sender_name,
-               TRIM(pr.last_name || ' ' || pr.first_name) as receiver_name
+               TRIM(ps.last_name || \' \' || ps.first_name) as sender_name,
+               TRIM(pr.last_name || \' \' || pr.first_name) as receiver_name
         FROM messages m
         JOIN profiles ps ON m.sender_id = ps.user_id
         JOIN profiles pr ON m.receiver_id = pr.user_id
