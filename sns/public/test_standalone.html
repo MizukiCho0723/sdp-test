@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>C1 単体テスト (スタンドアロン版)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Consolas', 'Courier New', monospace; background: #1e1e1e; color: #d4d4d4; padding: 24px; }
+    h1 { color: #9cdcfe; font-size: 1.4em; margin-bottom: 8px; }
+    .subtitle { color: #808080; font-size: 0.85em; margin-bottom: 24px; }
+    h2 { color: #4fc1ff; font-size: 1em; margin: 20px 0 4px; padding: 4px 8px; background: #252526; border-left: 3px solid #4fc1ff; }
+    .pass { color: #4ec9b0; padding: 1px 0; }
+    .fail { color: #f44747; padding: 1px 0; }
+    pre { white-space: pre-wrap; word-break: break-all; }
+    .summary { margin-top: 28px; padding: 12px 16px; border-radius: 4px; font-size: 1.1em; font-weight: bold; }
+    .all-pass { background: #1a3a1a; border: 1px solid #4ec9b0; color: #4ec9b0; }
+    .has-fail  { background: #3a1a1a; border: 1px solid #f44747; color: #f44747; }
+    #output { line-height: 1.6; }
+  </style>
+</head>
+<body>
+<h1>C1 単体テストランナー</h1>
+<p class="subtitle">対象: c1_shared.js / c1_m1_router.js / c1_m3_auth_mediator.js / c1_m5_post_mediator.js / c1_m7_profile_mediator.js</p>
+<div id="output"></div>
+
+<script>
+// ============================================================
+//  テストフレームワーク
+// ============================================================
+let _pass = 0, _fail = 0;
+const _out = document.getElementById('output');
+
+function section(name) {
+  const h = document.createElement('h2');
+  h.textContent = name;
+  _out.appendChild(h);
+}
+
+function test(desc, fn) {
+  try {
+    fn();
+    _pass++;
+    const pre = document.createElement('pre');
+    pre.className = 'pass';
+    pre.textContent = '  ✓ ' + desc;
+    _out.appendChild(pre);
+  } catch (e) {
+    _fail++;
+    const pre = document.createElement('pre');
+    pre.className = 'fail';
+    pre.textContent = '  ✗ ' + desc + '\n      → ' + e.message;
+    _out.appendChild(pre);
+  }
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || 'assertion failed');
+}
+function assertEqual(a, b) {
+  const as = JSON.stringify(a), bs = JSON.stringify(b);
+  if (as !== bs) throw new Error(`期待: ${bs}  実際: ${as}`);
+}
+
+// ============================================================
+//  テスト対象コードのコピー
+//  ※ DOMアクセスを含むトップレベル文を除いた純粋関数のみ抽出
+// ============================================================
+
+// ---- c1_shared.js より ----
+const API = {
+  auth: '/api/auth.php',
+  posts: '/api/posts.php',
+  messages: '/api/messages.php',
+  profiles: '/api/profiles.php',
+  notifications: '/api/notifications.php',
+};
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function gradeLabel(g) {
+  const map = { 0: '職員', 1: '学部1年', 2: '学部2年', 3: '学部3年', 4: '学部4年',
+    5: '修士1年', 6: '修士2年', 7: '博士1年', 8: '博士2年', 9: '博士3年', 10: '博士4年', 11: '教員' };
+  return map[g] || '不明';
+}
+
+function avatarEl(name, cls = '') {
+  const letter = (name || '?')[0].toUpperCase();
+  const colors = ['#1877f2', '#e41e3f', '#1a7a1a', '#e67e22', '#8e44ad'];
+  const c = colors[letter.charCodeAt(0) % colors.length];
+  return `<div class="avatar ${cls}" style="background:${c}">${letter}</div>`;
+}
+
+function timeAgo(dateStr) {
+  const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return 'たった今';
+  if (diff < 3600) return `${Math.floor(diff / 60)}分前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
+  return `${Math.floor(diff / 86400)}日前`;
+}
+
+function getGradeCat(grade) {
+  const g = parseInt(grade);
+  if ([1, 2, 3, 4, 11].includes(g)) return 'faculty';
+  if ([5, 6].includes(g)) return 'masters';
+  if ([7, 8, 9, 10].includes(g)) return 'doctoral';
+  if (g === 0) return 'staff';
+  return null;
+}
+
+const SHOZOKU_COURSES = {
+  '工学部': [
+    '機械工学課程 基幹機械コース(機械工学科)',
+    '機械工学課程 先進機械コース(機械機能工学科)',
+    '物質化学課程 環境・物質工学コース(材料工学科)',
+    '物質化学課程 化学・生命コース(応用化学科)',
+    '電気電子工学課程 電気・ロボット工学コース(電気工学科)',
+    '電気電子工学課程 先端電子工学コース(電子工学科)',
+    '情報・通信工学課程 情報通信コース(情報通信工学科)',
+    '情報・通信工学課程 情報工学コース(情報工学科)',
+    '土木工学課程 都市・環境コース(土木工学科)',
+    '先進国際課程',
+  ],
+  'システム理工学部': {
+    '情報課程(電子情報システム学科)': ['IoTコース', 'ソフトウェアコース', 'メディアコース', 'データサイエンスコース'],
+    '機械・電気課程(機械制御システム学科)': ['機械・電気コース'],
+    '建築・環境課程(環境システム学科)': ['建築コース', '環境・都市コース'],
+    '生命科学課程(生命科学科)': ['生命科学コース', '医工学コース', 'スポーツ工学コース'],
+    '数理科学課程(数理科学科)': ['数理科学コース'],
+  },
+  'デザイン工学部': {
+    'デザイン工学科': ['社会情報システムコース', 'UXコース', 'プロダクトコース', '生産・プロダクトデザイン系', 'ロボティクス・情報デザイン系'],
+  },
+  '建築学部': {
+    '建築学科': ['SAコース', 'UAコース', 'APコース'],
+  },
+  '大学院 理工学研究科': [
+    '電気電子情報工学専攻', '材料工学専攻', '応用化学専攻', '機械工学専攻',
+    'システム理工学専攻', '国際理工学専攻', '社会基盤学専攻', '建築学専攻',
+    '地域環境システム専攻', '機能制御システム専攻',
+  ],
+};
+
+const LAB_DATA = {
+  '機械工学課程 基幹機械コース(機械工学科)': [
+    '生産加工プロセス研究室(青木 孝史朗)', '機械制御工学研究室(内村 裕)', '燃焼工学研究室(斎藤 寛泰)',
+    '粒状体力学研究室(佐伯 暢人)', '固体力学研究室(坂上 賢一)', '臨床機械加工研究室(澤 武一)',
+    '熱流体理工学研究室(白井 克明)', '応用伝熱工学研究室(丹下 学)', 'エネルギー変換工学研究室(角田 和巳)',
+    '離散数学研究室(西村 強)', '材料強度学研究室(橋村 真治)', '生物微小流体工学研究室(二井 信行)',
+    '熱工学研究室(矢作 裕司)', '科学技術と社会研究室(栃内 文彦)',
+  ],
+  '機械工学課程 先進機械コース(機械機能工学科)': [],
+  '物質化学課程 環境・物質工学コース(材料工学科)': [],
+  '物質化学課程 化学・生命コース(応用化学科)': [],
+  '電気電子工学課程 電気・ロボット工学コース(電気工学科)': [],
+  '電気電子工学課程 先端電子工学コース(電子工学科)': [],
+  '情報・通信工学課程 情報通信コース(情報通信工学科)': [],
+  '情報・通信工学課程 情報工学コース(情報工学科)': [],
+  '土木工学課程 都市・環境コース(土木工学科)': [],
+  '先進国際課程': [],
+  '情報課程(電子情報システム学科) - IoTコース': [],
+  '情報課程(電子情報システム学科) - ソフトウェアコース': [],
+  '情報課程(電子情報システム学科) - メディアコース': [],
+  '情報課程(電子情報システム学科) - データサイエンスコース': [],
+  '機械・電気課程(機械制御システム学科) - 機械・電気コース': [],
+  '建築・環境課程(環境システム学科) - 建築コース': [],
+  '建築・環境課程(環境システム学科) - 環境・都市コース': [],
+  '生命科学課程(生命科学科) - 生命科学コース': [],
+  '生命科学課程(生命科学科) - 医工学コース': [],
+  '生命科学課程(生命科学科) - スポーツ工学コース': [],
+  '数理科学課程(数理科学科) - 数理科学コース': [],
+  'デザイン工学科 - 社会情報システムコース': [],
+  'デザイン工学科 - UXコース': [],
+  'デザイン工学科 - プロダクトコース': [],
+  'デザイン工学科 - 生産・プロダクトデザイン系': [],
+  'デザイン工学科 - ロボティクス・情報デザイン系': [],
+  '建築学科 - SAコース': [],
+  '建築学科 - UAコース': [],
+  '建築学科 - APコース': [],
+  '電気電子情報工学専攻': [], '材料工学専攻': [], '応用化学専攻': [], '機械工学専攻': [],
+  'システム理工学専攻': [], '国際理工学専攻': [], '社会基盤学専攻': [], '建築学専攻': [],
+  '地域環境システム専攻': [], '機能制御システム専攻': [],
+};
+
+function getAllLabsForFaculty(faculty) {
+  const courseData = SHOZOKU_COURSES[faculty];
+  if (!courseData) return [];
+  const keys = Array.isArray(courseData) ? courseData
+    : Object.entries(courseData).flatMap(([dept, courses]) => courses.map(c => dept + ' - ' + c));
+  return keys.flatMap(k => LAB_DATA[k] || []);
+}
+
+function getCourseKeyForLab(labValue) {
+  for (const [key, labs] of Object.entries(LAB_DATA)) {
+    if (labs.includes(labValue)) return key;
+  }
+  return null;
+}
+
+function getFacultyForCourseKey(courseKey) {
+  for (const [faculty, courseData] of Object.entries(SHOZOKU_COURSES)) {
+    if (Array.isArray(courseData)) {
+      if (courseData.includes(courseKey)) return faculty;
+    } else {
+      for (const [dept, courses] of Object.entries(courseData)) {
+        if (courses.some(c => dept + ' - ' + c === courseKey)) return faculty;
+      }
+    }
+  }
+  return null;
+}
+
+// ---- c1_m3_auth_mediator.js より ----
+function AuthenticateMediator(screen_id, form_data) {
+  switch (screen_id) {
+    case 'W1':
+      if (!form_data.email)
+        return { result: false, error_message: '学籍番号が存在しません' };
+      if (!form_data.email.endsWith('@shibaura-it.ac.jp'))
+        return { result: false, error_message: '学籍番号が存在しません' };
+      break;
+    case 'W2':
+      if (!form_data.password)
+        return { result: false, error_message: 'パスワードが入力されていません．' };
+      if (form_data.password.length < 8 || form_data.password.length > 16)
+        return { result: false, error_message: 'パスワードは8〜16文字で入力してください' };
+      if (!/[a-zA-Z]/.test(form_data.password) || !/[0-9]/.test(form_data.password))
+        return { result: false, error_message: 'パスワードには英数字記号すべてが含まれている必要があります．' };
+      if (form_data.password !== form_data.confirm)
+        return { result: false, error_message: 'パスワードが一致しません．' };
+      break;
+    case 'W5':
+      if (!form_data.email)
+        return { result: false, error_message: 'IDが入力されていません．' };
+      if (!form_data.password)
+        return { result: false, error_message: 'パスワードが入力されていません．' };
+      break;
+    case 'W6':
+      if (!form_data.email)
+        return { result: false, error_message: '学籍番号が入力されていません．' };
+      if (!form_data.email.endsWith('@shibaura-it.ac.jp'))
+        return { result: false, error_message: '学籍番号が存在しません' };
+      break;
+    case 'W7':
+      if (!form_data.code)
+        return { result: false, error_message: '学籍番号が入力されていません' };
+      if (!form_data.password)
+        return { result: false, error_message: '新しいパスワードが入力されていません．' };
+      if (!form_data.confirm)
+        return { result: false, error_message: 'もう一度入力にも入力してください．' };
+      if (form_data.password !== form_data.confirm)
+        return { result: false, error_message: 'パスワードが異なっています．' };
+      break;
+  }
+  return { result: true, error_message: '' };
+}
+
+// ---- c1_m5_post_mediator.js より ----
+function PostDataMediator(user_id, content, target_post_id) {
+  const isReply = target_post_id !== null && target_post_id !== undefined;
+  if (!content || content.trim() === '') {
+    return {
+      is_success: false,
+      error_message: isReply
+        ? '返信内容を入力してください．'
+        : '投稿内容を入力してください．',
+    };
+  }
+  if (new Blob([content]).size > 1024) {
+    return {
+      is_success: false,
+      error_message: isReply
+        ? '返信内容は 1024 バイト以下（全角約 340 文字以内）にしてください．'
+        : '投稿内容は 1024 バイト以下（全角約 340 文字以内）にしてくだい．',
+    };
+  }
+  return { is_success: true, error_message: '' };
+}
+
+// ---- c1_m7_profile_mediator.js より ----
+function ProfileDataMediator(action_type, profile_data) {
+  switch (action_type) {
+    case 'initial': return _validateInitialProfile(profile_data);
+    case 'update':  return _validateUpdateProfile(profile_data);
+    default:        return { status: 'error', message: '不正なアクション' };
+  }
+}
+function _validateInitialProfile({ last_name, grade }) {
+  if (!last_name || last_name.trim() === '')
+    return { status: 'error', message: '氏名を入力してください．' };
+  if (grade === '' || grade === null || grade === undefined)
+    return { status: 'error', message: '学年/職員欄を選択してください．' };
+  return { status: 'ok' };
+}
+function _validateUpdateProfile({ last_name, first_name, bio }) {
+  if (!last_name || last_name.trim() === '')
+    return { status: 'error', message: '名前（姓）を入力してください（名前は必須項目です）' };
+  if (new Blob([last_name + ' ' + (first_name || '')]).size > 64)
+    return { status: 'error', message: '名前は 64 バイト以下（全角約 21 文字以内）にしてください．' };
+  if (bio && new Blob([bio]).size > 1024)
+    return { status: 'error', message: '自己紹介は 1024 バイト以下（全角約 340 文字以内）にしてください．' };
+  return { status: 'ok' };
+}
+
+// ---- c1_m1_router.js より (DOM スタブ付き) ----
+let currentUserId = null, currentPage = 'timeline', prevPage = null;
+let chatPartnerId = null, chatInterval = null;
+
+// RouterMain が呼び出す関数のスタブ
+const loadTimeline = () => {}, loadPartners = () => {}, loadNotifications = () => {};
+const loadMyProfile = () => {}, loadPostDetail = () => {}, openChat = () => {};
+const loadOtherProfile = () => {}, loadEditProfile = () => {}, startNotifPolling = () => {};
+const showError = (msg) => {};
+
+// 最低限のDOM要素をスクリプト内で生成してルーターをテスト
+const _pages = ['timeline','search','messages','notifications','myprofile',
+                'postDetail','chat','otherProfile','editProfile'];
+_pages.forEach(p => {
+  const d = document.createElement('div');
+  d.id = 'page' + p.charAt(0).toUpperCase() + p.slice(1);
+  d.className = 'page';
+  if (p === 'search') {
+    const sr = document.createElement('div'); sr.id = 'searchResults'; d.appendChild(sr);
+  }
+  document.body.appendChild(d);
+});
+
+function RouterMain(request_url, extra = {}) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pageEl = document.getElementById('page' + request_url.charAt(0).toUpperCase() + request_url.slice(1));
+  if (!pageEl) { showError('ページが見つかりません'); return 0; }
+  pageEl.classList.add('active');
+  if (chatInterval && request_url !== 'chat') { clearInterval(chatInterval); chatInterval = null; }
+  prevPage = currentPage;
+  currentPage = request_url;
+  if (request_url === 'timeline')      loadTimeline();
+  if (request_url === 'search')        document.getElementById('searchResults').innerHTML = '';
+  if (request_url === 'messages')      loadPartners();
+  if (request_url === 'notifications') loadNotifications();
+  if (request_url === 'myprofile')     loadMyProfile();
+  if (request_url === 'postDetail'    && extra.postId)    loadPostDetail(extra.postId);
+  if (request_url === 'chat'          && extra.partnerId) openChat(extra.partnerId);
+  if (request_url === 'otherProfile'  && extra.userId)    loadOtherProfile(extra.userId);
+  if (request_url === 'editProfile')   loadEditProfile();
+  return 1;
+}
+
+// ============================================================
+//  テストケース
+// ============================================================
+
+// ---- esc() ----
+section('c1_shared.js ▶ esc()  XSSエスケープ');
+test('null → 空文字', () => assertEqual(esc(null), ''));
+test('undefined → 空文字', () => assertEqual(esc(undefined), ''));
+test('数値を文字列化して返す', () => assertEqual(esc(42), '42'));
+test('& → &amp;', () => assertEqual(esc('a & b'), 'a &amp; b'));
+test('< と > をエスケープ', () => assertEqual(esc('<script>'), '&lt;script&gt;'));
+test('" をエスケープ', () => assertEqual(esc('"hello"'), '&quot;hello&quot;'));
+test("' をエスケープ", () => assertEqual(esc("it's"), 'it&#039;s'));
+test('エスケープ不要な文字はそのまま', () => assertEqual(esc('hello world'), 'hello world'));
+test('複合エスケープ', () => {
+  assertEqual(
+    esc('<a href="x" onclick=\'alert(1)\'>'),
+    '&lt;a href=&quot;x&quot; onclick=&#039;alert(1)&#039;&gt;'
+  );
+});
+
+// ---- gradeLabel() ----
+section('c1_shared.js ▶ gradeLabel()  学年ラベル変換');
+[
+  [0,'職員'],[1,'学部1年'],[2,'学部2年'],[3,'学部3年'],[4,'学部4年'],
+  [5,'修士1年'],[6,'修士2年'],[7,'博士1年'],[8,'博士2年'],
+  [9,'博士3年'],[10,'博士4年'],[11,'教員'],
+].forEach(([g, expected]) => {
+  test(`${g} → ${expected}`, () => assertEqual(gradeLabel(g), expected));
+});
+test('未定義値 → 不明', () => assertEqual(gradeLabel(99), '不明'));
+
+// ---- avatarEl() ----
+section('c1_shared.js ▶ avatarEl()  アバター要素生成');
+test('頭文字が大文字で含まれる', () => assert(avatarEl('alice').includes('>A<')));
+test('class="avatar" が含まれる', () => assert(avatarEl('Bob').includes('class="avatar')));
+test('追加クラスが付与される', () => assert(avatarEl('Carol', 'sm').includes('class="avatar sm"')));
+test('空文字 → ? を使う', () => assert(avatarEl('').includes('>?<')));
+test('null → ? を使う', () => assert(avatarEl(null).includes('>?<')));
+test('背景色が style に含まれる', () => assert(avatarEl('Alice').includes('background:')));
+test('異なる名前で色が変わる可能性がある', () => {
+  const colA = avatarEl('A').match(/background:(#[0-9a-f]+)/i)?.[1];
+  const colZ = avatarEl('Z').match(/background:(#[0-9a-f]+)/i)?.[1];
+  assert(colA !== undefined && colZ !== undefined, '背景色が取得できない');
+});
+
+// ---- timeAgo() ----
+section('c1_shared.js ▶ timeAgo()  相対時刻表示');
+function isoNow(offsetSec) {
+  // timeAgo() は 'Z' 付きで UTC として解析するため、UTC 文字列を生成する
+  return new Date(Date.now() - offsetSec * 1000).toISOString().replace('T', ' ').slice(0, 19);
+}
+test('30秒前 → たった今', () => assertEqual(timeAgo(isoNow(30)), 'たった今'));
+test('5分前 → 5分前', () => assertEqual(timeAgo(isoNow(300)), '5分前'));
+test('59分前 → 59分前', () => assertEqual(timeAgo(isoNow(59 * 60)), '59分前'));
+test('1時間前 → 1時間前', () => assertEqual(timeAgo(isoNow(3600)), '1時間前'));
+test('3時間前 → 3時間前', () => assertEqual(timeAgo(isoNow(3 * 3600)), '3時間前'));
+test('1日前 → 1日前', () => assertEqual(timeAgo(isoNow(86400)), '1日前'));
+test('7日前 → 7日前', () => assertEqual(timeAgo(isoNow(7 * 86400)), '7日前'));
+
+// ---- getGradeCat() ----
+section('c1_shared.js ▶ getGradeCat()  学年カテゴリ分類');
+[
+  [0,'staff'],[1,'faculty'],[2,'faculty'],[3,'faculty'],[4,'faculty'],[11,'faculty'],
+  [5,'masters'],[6,'masters'],
+  [7,'doctoral'],[8,'doctoral'],[9,'doctoral'],[10,'doctoral'],
+].forEach(([g, cat]) => {
+  test(`${g} → ${cat}`, () => assertEqual(getGradeCat(g), cat));
+});
+test('不正値 → null', () => assertEqual(getGradeCat(99), null));
+
+// ---- getAllLabsForFaculty() ----
+section('c1_shared.js ▶ getAllLabsForFaculty()  学部別ラボ一覧');
+test('存在しない学部 → []', () => assertEqual(getAllLabsForFaculty('存在しない'), []));
+test('工学部 → 配列を返す', () => assert(Array.isArray(getAllLabsForFaculty('工学部'))));
+test('工学部 → 1件以上のラボ', () => assert(getAllLabsForFaculty('工学部').length > 0));
+test('工学部 → 熱工学研究室が含まれる', () => {
+  assert(getAllLabsForFaculty('工学部').some(l => l.includes('熱工学研究室')));
+});
+test('システム理工学部 → 配列を返す', () => assert(Array.isArray(getAllLabsForFaculty('システム理工学部'))));
+test('大学院 理工学研究科 → [] (ラボ未登録)', () => {
+  assertEqual(getAllLabsForFaculty('大学院 理工学研究科').length, 0);
+});
+
+// ---- getCourseKeyForLab() ----
+section('c1_shared.js ▶ getCourseKeyForLab()  ラボ→コースキー逆引き');
+test('既知のラボ → 正しいコースキー', () => {
+  assertEqual(
+    getCourseKeyForLab('熱工学研究室(矢作 裕司)'),
+    '機械工学課程 基幹機械コース(機械工学科)'
+  );
+});
+test('別の既知ラボ → 正しいコースキー', () => {
+  assertEqual(
+    getCourseKeyForLab('燃焼工学研究室(斎藤 寛泰)'),
+    '機械工学課程 基幹機械コース(機械工学科)'
+  );
+});
+test('存在しないラボ → null', () => assertEqual(getCourseKeyForLab('幻の研究室'), null));
+
+// ---- getFacultyForCourseKey() ----
+section('c1_shared.js ▶ getFacultyForCourseKey()  コースキー→学部逆引き');
+test('工学部コース → 工学部', () => {
+  assertEqual(getFacultyForCourseKey('機械工学課程 基幹機械コース(機械工学科)'), '工学部');
+});
+test('システム理工学部コース → システム理工学部', () => {
+  assertEqual(getFacultyForCourseKey('情報課程(電子情報システム学科) - IoTコース'), 'システム理工学部');
+});
+test('デザイン工学部コース → デザイン工学部', () => {
+  assertEqual(getFacultyForCourseKey('デザイン工学科 - UXコース'), 'デザイン工学部');
+});
+test('存在しないコースキー → null', () => assertEqual(getFacultyForCourseKey('幻のコース'), null));
+
+// ---- AuthenticateMediator() ----
+section('c1_m3_auth_mediator.js ▶ AuthenticateMediator()  入力バリデーション');
+
+test('W1: 正常メール → 成功', () => {
+  assertEqual(AuthenticateMediator('W1', { email: 'ab123456@shibaura-it.ac.jp' }).result, true);
+});
+test('W1: メール空 → 失敗', () => {
+  assert(!AuthenticateMediator('W1', { email: '' }).result);
+});
+test('W1: 別ドメイン → 失敗', () => {
+  assert(!AuthenticateMediator('W1', { email: 'user@gmail.com' }).result);
+});
+test('W1: 失敗時にエラーメッセージあり', () => {
+  assert(AuthenticateMediator('W1', { email: '' }).error_message !== '');
+});
+
+test('W2: 有効パスワード(英数字8文字) → 成功', () => {
+  assertEqual(AuthenticateMediator('W2', { password: 'Pass1234', confirm: 'Pass1234' }).result, true);
+});
+test('W2: パスワード空 → 失敗', () => {
+  assert(!AuthenticateMediator('W2', { password: '', confirm: '' }).result);
+});
+test('W2: 7文字(短い) → 失敗', () => {
+  assert(!AuthenticateMediator('W2', { password: 'Pass123', confirm: 'Pass123' }).result);
+});
+test('W2: 16文字(上限) → 成功', () => {
+  assertEqual(AuthenticateMediator('W2', { password: 'Password1234abcd', confirm: 'Password1234abcd' }).result, true);
+});
+test('W2: 17文字(超過) → 失敗', () => {
+  assert(!AuthenticateMediator('W2', { password: 'Password1234abcde', confirm: 'Password1234abcde' }).result);
+});
+test('W2: 英字なし → 失敗', () => {
+  assert(!AuthenticateMediator('W2', { password: '12345678', confirm: '12345678' }).result);
+});
+test('W2: 数字なし → 失敗', () => {
+  assert(!AuthenticateMediator('W2', { password: 'abcdefgh', confirm: 'abcdefgh' }).result);
+});
+test('W2: 確認パスワード不一致 → 失敗', () => {
+  assert(!AuthenticateMediator('W2', { password: 'Pass1234', confirm: 'Pass9999' }).result);
+});
+
+test('W5: IDとパスワードあり → 成功', () => {
+  assertEqual(AuthenticateMediator('W5', { email: 'user@example.com', password: 'any' }).result, true);
+});
+test('W5: メール空 → 失敗', () => {
+  assert(!AuthenticateMediator('W5', { email: '', password: 'pass' }).result);
+});
+test('W5: パスワード空 → 失敗', () => {
+  assert(!AuthenticateMediator('W5', { email: 'user@example.com', password: '' }).result);
+});
+
+test('W6: 正常メール → 成功', () => {
+  assertEqual(AuthenticateMediator('W6', { email: 'ab123456@shibaura-it.ac.jp' }).result, true);
+});
+test('W6: メール空 → 失敗', () => {
+  assert(!AuthenticateMediator('W6', { email: '' }).result);
+});
+test('W6: 別ドメイン → 失敗', () => {
+  assert(!AuthenticateMediator('W6', { email: 'user@gmail.com' }).result);
+});
+
+test('W7: 正常入力 → 成功', () => {
+  assertEqual(AuthenticateMediator('W7', { code: '123456', password: 'NewPass1', confirm: 'NewPass1' }).result, true);
+});
+test('W7: コード空 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '', password: 'NewPass1', confirm: 'NewPass1' }).result);
+});
+test('W7: 新パスワード空 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '123', password: '', confirm: '' }).result);
+});
+test('W7: 確認空 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '123', password: 'NewPass1', confirm: '' }).result);
+});
+test('W7: パスワード不一致 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '123', password: 'NewPass1', confirm: 'Different' }).result);
+});
+
+// ---- PostDataMediator() ----
+section('c1_m5_post_mediator.js ▶ PostDataMediator()  投稿・返信バリデーション');
+test('正常投稿 → 成功', () => assertEqual(PostDataMediator(1, 'こんにちは！', null).is_success, true));
+test('空投稿 → 失敗', () => assert(!PostDataMediator(1, '', null).is_success));
+test('空投稿 → 「投稿」エラーメッセージ', () => {
+  assert(PostDataMediator(1, '', null).error_message.includes('投稿'));
+});
+test('スペースのみ → 失敗', () => assert(!PostDataMediator(1, '   ', null).is_success));
+test('null投稿 → 失敗', () => assert(!PostDataMediator(1, null, null).is_success));
+test('1024バイト超え(全角) → 失敗', () => {
+  assert(!PostDataMediator(1, 'あ'.repeat(400), null).is_success); // 1200バイト超
+});
+test('100バイト以内 → 成功', () => assertEqual(PostDataMediator(1, 'a'.repeat(100), null).is_success, true));
+test('返信が空 → 「返信」エラーメッセージ', () => {
+  assert(PostDataMediator(1, '', 5).error_message.includes('返信'));
+});
+test('返信が正常 → 成功', () => assertEqual(PostDataMediator(1, '返信します', 5).is_success, true));
+test('返信が1024バイト超え → 「返信」エラーメッセージ', () => {
+  const r = PostDataMediator(1, 'あ'.repeat(400), 10);
+  assert(!r.is_success && r.error_message.includes('返信'));
+});
+
+// ---- ProfileDataMediator() ----
+section('c1_m7_profile_mediator.js ▶ ProfileDataMediator()  プロフィールバリデーション');
+
+test('initial: 正常 → ok', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: '1' }).status, 'ok');
+});
+test('initial: 姓が空 → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '', grade: '1' }).status, 'error');
+});
+test('initial: 姓がスペースのみ → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '   ', grade: '1' }).status, 'error');
+});
+test('initial: grade が空文字 → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: '' }).status, 'error');
+});
+test('initial: grade が null → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: null }).status, 'error');
+});
+test('initial: grade が undefined → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: undefined }).status, 'error');
+});
+test('initial: grade が 0(職員) → ok', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: '0' }).status, 'ok');
+});
+
+test('update: 正常 → ok', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '山田', first_name: '太郎', bio: '学生です' }).status, 'ok');
+});
+test('update: 姓が空 → error', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '', first_name: '', bio: '' }).status, 'error');
+});
+test('update: 姓がスペースのみ → error', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '  ', first_name: '', bio: '' }).status, 'error');
+});
+test('update: 名前64バイト超え → error', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: 'あ'.repeat(22), first_name: '', bio: '' }).status, 'error');
+});
+test('update: bio 1024バイト超え → error', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '山田', first_name: '', bio: 'あ'.repeat(400) }).status, 'error');
+});
+test('update: bio なし → ok', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '山田', first_name: '', bio: '' }).status, 'ok');
+});
+test('update: bio が null → ok (null は 0 バイト扱い)', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '山田', first_name: '', bio: null }).status, 'ok');
+});
+test('不正アクション → error', () => {
+  assertEqual(ProfileDataMediator('invalid', {}).status, 'error');
+});
+
+// ---- RouterMain() ----
+section('c1_m1_router.js ▶ RouterMain()  画面遷移制御');
+test('存在するページ → 1 を返す', () => assertEqual(RouterMain('timeline'), 1));
+test('存在しないページ → 0 を返す', () => assertEqual(RouterMain('nonexistentXYZ'), 0));
+test('遷移後に currentPage が更新される', () => {
+  RouterMain('search'); assertEqual(currentPage, 'search');
+});
+test('prevPage が前のページになる', () => {
+  RouterMain('timeline'); RouterMain('messages');
+  assertEqual(prevPage, 'timeline');
+});
+test('遷移先ページに active クラスが付く', () => {
+  RouterMain('timeline');
+  assert(document.getElementById('pageTimeline').classList.contains('active'));
+});
+test('別ページへ遷移すると前ページの active が消える', () => {
+  RouterMain('timeline'); RouterMain('search');
+  assert(!document.getElementById('pageTimeline').classList.contains('active'));
+  assert(document.getElementById('pageSearch').classList.contains('active'));
+});
+test('navigate は RouterMain の別名として同じ結果を返す', () => {
+  const navigate = (p, e={}) => RouterMain(p, e);
+  assertEqual(navigate('myprofile'), 1);
+});
+
+// ============================================================
+//  サマリー表示
+// ============================================================
+const summary = document.createElement('div');
+summary.className = 'summary ' + (_fail === 0 ? 'all-pass' : 'has-fail');
+summary.textContent = `結果: ${_pass + _fail} テスト中  ✓ ${_pass} 成功  /  ✗ ${_fail} 失敗`;
+_out.appendChild(summary);
+</script>
+</body>
+</html>

@@ -2,11 +2,11 @@
 // 外部変数(設計書 4章)および各モジュール共通の関数・データ群
 
 const API = {
-  auth: '/api/auth.php',
-  posts: '/api/posts.php',
-  messages: '/api/messages.php',
-  profiles: '/api/profiles.php',
-  notifications: '/api/notifications.php',
+  auth: '/api/auth',
+  posts: '/api/posts',
+  messages: '/api/messages',
+  profiles: '/api/profiles',
+  notifications: '/api/notifications',
 };
 
 // 外部変数
@@ -76,7 +76,7 @@ function avatarEl(name, cls = '') {
 }
 
 function timeAgo(dateStr) {
-  const d = new Date(dateStr.replace(' ', 'T'));
+  const d = new Date(dateStr.replace(' ', 'T') + 'Z');
   const diff = (Date.now() - d.getTime()) / 1000;
   if (diff < 60) return 'たった今';
   if (diff < 3600) return `${Math.floor(diff / 60)}分前`;

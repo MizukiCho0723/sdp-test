@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>C1 単体テストランナー</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    h1 { color: #9cdcfe; }
+    h2 { color: #4fc1ff; margin-top: 24px; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; }
+    .skip { color: #808080; }
+    .summary { font-size: 1.2em; margin-top: 24px; padding: 12px; border: 1px solid #555; }
+    .summary.all-pass { border-color: #4ec9b0; color: #4ec9b0; }
+    .summary.has-fail  { border-color: #f44747; color: #f44747; }
+    pre { margin: 0; padding: 2px 0; }
+  </style>
+</head>
+<body>
+<h1>C1 単体テストランナー</h1>
+<div id="output"></div>
+
+<!-- ===== DOM スタブ (各スクリプトがロード時にアクセスする要素) ===== -->
+<!-- c1_shared.js -->
+<div id="errorDialog" style="display:none"></div>
+<div id="errorDialogMsg"></div>
+<button id="errorDialogOk"></button>
+<!-- 検索フォーム用 -->
+<input id="searchFaculty" value=""><input id="searchCourse" value=""><input id="searchLab" value="">
+<div id="labSearchDropdown"></div>
+<!-- c1_m3_auth_mediator.js -->
+<button id="sendCodeBtn"></button>
+<button id="verifyCodeBtn"></button>
+<button id="completeRegBtn"></button>
+<button id="resetSendCodeBtn"></button>
+<button id="resetSubmitBtn"></button>
+<input id="regEmail"><input id="regCode"><input id="regPassword"><input id="regPasswordConfirm">
+<input id="regLastName"><input id="regFirstName"><select id="regGrade"></select>
+<input id="regClubs"><textarea id="regBio"></textarea>
+<div id="regStep1Error"></div><div id="regStep2Error"></div><div id="regStep3Error"></div>
+<div id="regStep2" style="display:none"></div><div id="regStep3" style="display:none"></div>
+<div id="resetStep1"></div><div id="resetStep2" style="display:none"></div>
+<input id="resetEmail"><input id="resetCode"><input id="resetPassword"><input id="resetPasswordConfirm">
+<div id="resetStep1Error"></div><div id="resetStep2Error"></div>
+<!-- c1_m7_profile_mediator.js -->
+<form id="editProfileForm"></form>
+<input id="editLastName"><input id="editFirstName"><textarea id="editBio"></textarea>
+<select id="editGrade"></select><input id="editClubs"><textarea id="editTimetable"></textarea>
+<div id="editProfileError"></div>
+<!-- c1_m9_message_mediator.js -->
+<button id="chatSendBtn"></button>
+<input id="chatInput">
+<button id="backToMessages"></button>
+<div id="chatMessages" style="scroll-height:0;scroll-top:0;client-height:0"></div>
+<div id="chatPartnerName"></div><div id="chatPartnerAvatar"></div>
+<div id="chatError"></div>
+<!-- c1_m1_router.js のページ要素 -->
+<div id="pageTimeline"    class="page"></div>
+<div id="pageSearch"      class="page"><div id="searchResults"></div></div>
+<div id="pageMessages"    class="page"></div>
+<div id="pageNotifications" class="page"></div>
+<div id="pageMyprofile"   class="page"></div>
+<div id="pagePostDetail"  class="page"></div>
+<div id="pageChat"        class="page"></div>
+<div id="pageOtherProfile" class="page"></div>
+<div id="pageEditProfile" class="page"></div>
+<!-- authSection / appSection -->
+<div id="authSection"></div><div id="appSection" style="display:none"></div>
+<div id="loginPage" style="display:none"></div>
+<div id="registerPage" style="display:none"></div>
+<div id="resetPage" style="display:none"></div>
+
+<!-- ===== ロードするモジュール ===== -->
+<script src="c1_shared.js"></script>
+<script src="c1_m1_router.js"></script>
+<script src="c1_m3_auth_mediator.js"></script>
+<script src="c1_m5_post_mediator.js"></script>
+<script src="c1_m7_profile_mediator.js"></script>
+
+<script>
+// ===== テストフレームワーク =====
+let _pass = 0, _fail = 0;
+const _out = document.getElementById('output');
+let _section = '';
+
+function section(name) {
+  _section = name;
+  const h = document.createElement('h2');
+  h.textContent = name;
+  _out.appendChild(h);
+}
+
+function test(desc, fn) {
+  try {
+    fn();
+    _pass++;
+    const pre = document.createElement('pre');
+    pre.className = 'pass';
+    pre.textContent = '  ✓ ' + desc;
+    _out.appendChild(pre);
+  } catch (e) {
+    _fail++;
+    const pre = document.createElement('pre');
+    pre.className = 'fail';
+    pre.textContent = '  ✗ ' + desc + '\n      ' + e.message;
+    _out.appendChild(pre);
+  }
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || 'assertion failed');
+}
+
+function assertEqual(a, b) {
+  const as = JSON.stringify(a), bs = JSON.stringify(b);
+  if (as !== bs) throw new Error(`期待: ${bs}  実際: ${as}`);
+}
+
+// ===== c1_shared.js - esc() =====
+section('c1_shared.js ▶ esc()');
+
+test('nullを渡すと空文字を返す', () => assertEqual(esc(null), ''));
+test('undefinedを渡すと空文字を返す', () => assertEqual(esc(undefined), ''));
+test('数値を文字列化して返す', () => assertEqual(esc(42), '42'));
+test('& をエスケープする', () => assertEqual(esc('a & b'), 'a &amp; b'));
+test('< と > をエスケープする', () => assertEqual(esc('<script>'), '&lt;script&gt;'));
+test('" をエスケープする', () => assertEqual(esc('"hello"'), '&quot;hello&quot;'));
+test("' をエスケープする", () => assertEqual(esc("it's"), 'it&#039;s'));
+test('エスケープ不要な文字列はそのまま返す', () => assertEqual(esc('hello world'), 'hello world'));
+test('複合エスケープ', () => {
+  assertEqual(esc('<a href="x" onclick=\'alert(1)\'>'), '&lt;a href=&quot;x&quot; onclick=&#039;alert(1)&#039;&gt;');
+});
+
+// ===== c1_shared.js - gradeLabel() =====
+section('c1_shared.js ▶ gradeLabel()');
+
+test('0 → 職員', () => assertEqual(gradeLabel(0), '職員'));
+test('1 → 学部1年', () => assertEqual(gradeLabel(1), '学部1年'));
+test('2 → 学部2年', () => assertEqual(gradeLabel(2), '学部2年'));
+test('3 → 学部3年', () => assertEqual(gradeLabel(3), '学部3年'));
+test('4 → 学部4年', () => assertEqual(gradeLabel(4), '学部4年'));
+test('5 → 修士1年', () => assertEqual(gradeLabel(5), '修士1年'));
+test('6 → 修士2年', () => assertEqual(gradeLabel(6), '修士2年'));
+test('7 → 博士1年', () => assertEqual(gradeLabel(7), '博士1年'));
+test('8 → 博士2年', () => assertEqual(gradeLabel(8), '博士2年'));
+test('9 → 博士3年', () => assertEqual(gradeLabel(9), '博士3年'));
+test('10 → 博士4年', () => assertEqual(gradeLabel(10), '博士4年'));
+test('11 → 教員', () => assertEqual(gradeLabel(11), '教員'));
+test('未定義値 → 不明', () => assertEqual(gradeLabel(99), '不明'));
+
+// ===== c1_shared.js - avatarEl() =====
+section('c1_shared.js ▶ avatarEl()');
+
+test('名前の頭文字が大文字で含まれる', () => {
+  const html = avatarEl('alice');
+  assert(html.includes('>A<'), `'>A<' が含まれない: ${html}`);
+});
+test('class="avatar" が含まれる', () => {
+  assert(avatarEl('Bob').includes('class="avatar"'));
+});
+test('追加クラスが付与される', () => {
+  assert(avatarEl('Carol', 'sm').includes('class="avatar sm"'));
+});
+test('空文字の場合は ? を使う', () => {
+  assert(avatarEl('').includes('>?<'));
+});
+test('nullの場合は ? を使う', () => {
+  assert(avatarEl(null).includes('>?<'));
+});
+test('背景色が style に含まれる', () => {
+  assert(avatarEl('Alice').includes('background:'));
+});
+
+// ===== c1_shared.js - timeAgo() =====
+section('c1_shared.js ▶ timeAgo()');
+
+function isoNow(offsetSec) {
+  return new Date(Date.now() - offsetSec * 1000).toISOString().replace('T', ' ').slice(0, 19);
+}
+
+test('30秒前 → たった今', () => assertEqual(timeAgo(isoNow(30)), 'たった今'));
+test('5分前 → 5分前', () => assertEqual(timeAgo(isoNow(300)), '5分前'));
+test('59分前 → 59分前', () => assertEqual(timeAgo(isoNow(59 * 60)), '59分前'));
+test('1時間前 → 1時間前', () => assertEqual(timeAgo(isoNow(3600)), '1時間前'));
+test('3時間前 → 3時間前', () => assertEqual(timeAgo(isoNow(3 * 3600)), '3時間前'));
+test('1日前 → 1日前', () => assertEqual(timeAgo(isoNow(86400)), '1日前'));
+test('7日前 → 7日前', () => assertEqual(timeAgo(isoNow(7 * 86400)), '7日前'));
+
+// ===== c1_shared.js - getGradeCat() =====
+section('c1_shared.js ▶ getGradeCat()');
+
+test('0 → staff', () => assertEqual(getGradeCat(0), 'staff'));
+test('1 → faculty', () => assertEqual(getGradeCat(1), 'faculty'));
+test('2 → faculty', () => assertEqual(getGradeCat(2), 'faculty'));
+test('3 → faculty', () => assertEqual(getGradeCat(3), 'faculty'));
+test('4 → faculty', () => assertEqual(getGradeCat(4), 'faculty'));
+test('11 → faculty', () => assertEqual(getGradeCat(11), 'faculty'));
+test('5 → masters', () => assertEqual(getGradeCat(5), 'masters'));
+test('6 → masters', () => assertEqual(getGradeCat(6), 'masters'));
+test('7 → doctoral', () => assertEqual(getGradeCat(7), 'doctoral'));
+test('8 → doctoral', () => assertEqual(getGradeCat(8), 'doctoral'));
+test('9 → doctoral', () => assertEqual(getGradeCat(9), 'doctoral'));
+test('10 → doctoral', () => assertEqual(getGradeCat(10), 'doctoral'));
+test('不正値 → null', () => assertEqual(getGradeCat(99), null));
+
+// ===== c1_shared.js - getAllLabsForFaculty() =====
+section('c1_shared.js ▶ getAllLabsForFaculty()');
+
+test('存在しない学部 → []', () => assertEqual(getAllLabsForFaculty('存在しない'), []));
+test('工学部 → 配列を返す', () => {
+  const labs = getAllLabsForFaculty('工学部');
+  assert(Array.isArray(labs), '配列でない');
+  assert(labs.length > 0, 'ラボが空');
+});
+test('工学部 → 既知のラボが含まれる', () => {
+  const labs = getAllLabsForFaculty('工学部');
+  assert(labs.some(l => l.includes('熱工学研究室')), '熱工学研究室が含まれない');
+});
+test('システム理工学部 → 配列を返す', () => {
+  const labs = getAllLabsForFaculty('システム理工学部');
+  assert(Array.isArray(labs));
+});
+test('大学院 理工学研究科 → [] (ラボ未登録)', () => {
+  const labs = getAllLabsForFaculty('大学院 理工学研究科');
+  assert(Array.isArray(labs) && labs.length === 0, `空でない: ${labs.length}`);
+});
+
+// ===== c1_shared.js - getCourseKeyForLab() =====
+section('c1_shared.js ▶ getCourseKeyForLab()');
+
+test('既知のラボ → 正しいコースキーを返す', () => {
+  const key = getCourseKeyForLab('熱工学研究室(矢作 裕司)');
+  assertEqual(key, '機械工学課程 基幹機械コース(機械工学科)');
+});
+test('存在しないラボ → null', () => {
+  assertEqual(getCourseKeyForLab('存在しないラボ'), null);
+});
+
+// ===== c1_shared.js - getFacultyForCourseKey() =====
+section('c1_shared.js ▶ getFacultyForCourseKey()');
+
+test('工学部のコースキー → 工学部を返す', () => {
+  const fac = getFacultyForCourseKey('機械工学課程 基幹機械コース(機械工学科)');
+  assertEqual(fac, '工学部');
+});
+test('システム理工学部のコースキー → システム理工学部を返す', () => {
+  const fac = getFacultyForCourseKey('情報課程(電子情報システム学科) - IoTコース');
+  assertEqual(fac, 'システム理工学部');
+});
+test('存在しないコースキー → null', () => {
+  assertEqual(getFacultyForCourseKey('存在しないコース'), null);
+});
+
+// ===== c1_m3_auth_mediator.js - AuthenticateMediator() =====
+section('c1_m3_auth_mediator.js ▶ AuthenticateMediator()');
+
+// W1
+test('W1: 正常メールアドレス → 成功', () => {
+  assertEqual(AuthenticateMediator('W1', { email: 'ab123456@shibaura-it.ac.jp' }).result, true);
+});
+test('W1: メールが空 → 失敗', () => {
+  const r = AuthenticateMediator('W1', { email: '' });
+  assert(!r.result && r.error_message !== '');
+});
+test('W1: ドメインが違う → 失敗', () => {
+  const r = AuthenticateMediator('W1', { email: 'user@gmail.com' });
+  assert(!r.result);
+});
+
+// W2
+test('W2: 有効パスワード(英数字8文字以上) → 成功', () => {
+  const r = AuthenticateMediator('W2', { password: 'Pass1234', confirm: 'Pass1234' });
+  assertEqual(r.result, true);
+});
+test('W2: パスワードが空 → 失敗', () => {
+  const r = AuthenticateMediator('W2', { password: '', confirm: '' });
+  assert(!r.result);
+});
+test('W2: 7文字(短すぎる) → 失敗', () => {
+  const r = AuthenticateMediator('W2', { password: 'Pass123', confirm: 'Pass123' });
+  assert(!r.result);
+});
+test('W2: 17文字(長すぎる) → 失敗', () => {
+  const r = AuthenticateMediator('W2', { password: 'Pass12345678901234', confirm: 'Pass12345678901234' });
+  assert(!r.result);
+});
+test('W2: 英字なし → 失敗', () => {
+  const r = AuthenticateMediator('W2', { password: '12345678', confirm: '12345678' });
+  assert(!r.result);
+});
+test('W2: 数字なし → 失敗', () => {
+  const r = AuthenticateMediator('W2', { password: 'abcdefgh', confirm: 'abcdefgh' });
+  assert(!r.result);
+});
+test('W2: 確認パスワード不一致 → 失敗', () => {
+  const r = AuthenticateMediator('W2', { password: 'Pass1234', confirm: 'Pass9999' });
+  assert(!r.result);
+});
+
+// W5
+test('W5: IDとパスワードあり → 成功', () => {
+  const r = AuthenticateMediator('W5', { email: 'user@example.com', password: 'pass' });
+  assertEqual(r.result, true);
+});
+test('W5: メールが空 → 失敗', () => {
+  assert(!AuthenticateMediator('W5', { email: '', password: 'pass' }).result);
+});
+test('W5: パスワードが空 → 失敗', () => {
+  assert(!AuthenticateMediator('W5', { email: 'user@example.com', password: '' }).result);
+});
+
+// W6
+test('W6: 正常メール → 成功', () => {
+  assertEqual(AuthenticateMediator('W6', { email: 'ab123456@shibaura-it.ac.jp' }).result, true);
+});
+test('W6: メールが空 → 失敗', () => {
+  assert(!AuthenticateMediator('W6', { email: '' }).result);
+});
+test('W6: ドメインが違う → 失敗', () => {
+  assert(!AuthenticateMediator('W6', { email: 'user@gmail.com' }).result);
+});
+
+// W7
+test('W7: 正常入力 → 成功', () => {
+  const r = AuthenticateMediator('W7', { code: '123456', password: 'NewPass1', confirm: 'NewPass1' });
+  assertEqual(r.result, true);
+});
+test('W7: コードが空 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '', password: 'NewPass1', confirm: 'NewPass1' }).result);
+});
+test('W7: 新パスワードが空 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '123', password: '', confirm: '' }).result);
+});
+test('W7: 確認が空 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '123', password: 'NewPass1', confirm: '' }).result);
+});
+test('W7: パスワード不一致 → 失敗', () => {
+  assert(!AuthenticateMediator('W7', { code: '123', password: 'NewPass1', confirm: 'Different1' }).result);
+});
+
+// ===== c1_m5_post_mediator.js - PostDataMediator() =====
+section('c1_m5_post_mediator.js ▶ PostDataMediator()');
+
+test('正常投稿 → 成功', () => {
+  const r = PostDataMediator(1, 'こんにちは！', null);
+  assertEqual(r.is_success, true);
+});
+test('空投稿 → 失敗（投稿エラーメッセージ）', () => {
+  const r = PostDataMediator(1, '', null);
+  assert(!r.is_success && r.error_message.includes('投稿'));
+});
+test('スペースのみ → 失敗', () => {
+  const r = PostDataMediator(1, '   ', null);
+  assert(!r.is_success);
+});
+test('null投稿 → 失敗', () => {
+  assert(!PostDataMediator(1, null, null).is_success);
+});
+test('返信が空 → 失敗（返信エラーメッセージ）', () => {
+  const r = PostDataMediator(1, '', 5);
+  assert(!r.is_success && r.error_message.includes('返信'));
+});
+test('返信が正常 → 成功', () => {
+  assertEqual(PostDataMediator(1, '返信します', 5).is_success, true);
+});
+test('1024バイト超え → 失敗', () => {
+  const longText = 'あ'.repeat(400); // 'あ' は3バイト(UTF-8) → 1200バイト超
+  assert(!PostDataMediator(1, longText, null).is_success);
+});
+test('1024バイト超え(返信) → 返信エラーメッセージ', () => {
+  const longText = 'あ'.repeat(400);
+  const r = PostDataMediator(1, longText, 10);
+  assert(!r.is_success && r.error_message.includes('返信'));
+});
+test('ちょうど良いサイズ → 成功', () => {
+  const text = 'a'.repeat(100);
+  assertEqual(PostDataMediator(1, text, null).is_success, true);
+});
+
+// ===== c1_m7_profile_mediator.js - ProfileDataMediator() =====
+section('c1_m7_profile_mediator.js ▶ ProfileDataMediator()');
+
+// initial
+test('initial: 正常入力 → ok', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: '1' }).status, 'ok');
+});
+test('initial: 姓が空 → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '', grade: '1' }).status, 'error');
+});
+test('initial: 姓がスペースのみ → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '   ', grade: '1' }).status, 'error');
+});
+test('initial: gradeが空文字 → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: '' }).status, 'error');
+});
+test('initial: gradeがnull → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: null }).status, 'error');
+});
+test('initial: gradeがundefined → error', () => {
+  assertEqual(ProfileDataMediator('initial', { last_name: '山田', grade: undefined }).status, 'error');
+});
+
+// update
+test('update: 正常入力 → ok', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '山田', first_name: '太郎', bio: '学生です' }).status, 'ok');
+});
+test('update: 姓が空 → error', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '', first_name: '太郎', bio: '' }).status, 'error');
+});
+test('update: 姓がスペースのみ → error', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '  ', first_name: '', bio: '' }).status, 'error');
+});
+test('update: 名前が64バイト超え → error', () => {
+  const longName = 'あ'.repeat(22); // 66バイト超
+  assertEqual(ProfileDataMediator('update', { last_name: longName, first_name: '', bio: '' }).status, 'error');
+});
+test('update: bioが1024バイト超え → error', () => {
+  const longBio = 'あ'.repeat(400); // 1200バイト超
+  assertEqual(ProfileDataMediator('update', { last_name: '山田', first_name: '', bio: longBio }).status, 'error');
+});
+test('update: bioなし → ok', () => {
+  assertEqual(ProfileDataMediator('update', { last_name: '山田', first_name: '', bio: '' }).status, 'ok');
+});
+
+// 不正アクション
+test('不正アクション → error', () => {
+  assertEqual(ProfileDataMediator('invalid', {}).status, 'error');
+});
+
+// ===== c1_m1_router.js - RouterMain() =====
+section('c1_m1_router.js ▶ RouterMain()');
+
+// loadTimeline など未定義なので、必要なスタブを用意
+const _noopFns = ['loadTimeline', 'loadPartners', 'loadNotifications', 'loadMyProfile',
+  'loadPostDetail', 'openChat', 'loadOtherProfile', 'loadEditProfile', 'startNotifPolling'];
+_noopFns.forEach(fn => { if (typeof window[fn] === 'undefined') window[fn] = () => {}; });
+
+test('正常ページ → 1を返す', () => {
+  assertEqual(RouterMain('timeline'), 1);
+});
+test('存在しないページ → 0を返す', () => {
+  assertEqual(RouterMain('nonexistentPage'), 0);
+});
+test('正常遷移後 currentPage が更新される', () => {
+  RouterMain('search');
+  assertEqual(currentPage, 'search');
+});
+test('prevPage が更新される', () => {
+  RouterMain('timeline');
+  RouterMain('messages');
+  assertEqual(prevPage, 'timeline');
+});
+test('アクティブクラスが付与される', () => {
+  RouterMain('timeline');
+  assert(document.getElementById('pageTimeline').classList.contains('active'));
+});
+test('別ページ遷移後 前ページの active が消える', () => {
+  RouterMain('timeline');
+  RouterMain('search');
+  assert(!document.getElementById('pageTimeline').classList.contains('active'));
+});
+
+// ===== 結果サマリー =====
+const summary = document.createElement('div');
+summary.className = 'summary ' + (_fail === 0 ? 'all-pass' : 'has-fail');
+summary.textContent = `結果: ${_pass + _fail} テスト中 ${_pass} 成功 / ${_fail} 失敗`;
+_out.appendChild(summary);
+</script>
+</body>
+</html>
