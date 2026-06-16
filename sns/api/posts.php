@@ -43,7 +43,7 @@ function listPosts(int $userId): void {
     $db = getDB();
     $stmt = $db->prepare('
         SELECT p.post_id, p.content, p.created_at,
-               pr.name, pr.icon_id, p.user_id,
+               TRIM(pr.last_name || ' ' || pr.first_name) AS name, pr.icon_id, p.user_id,
                (SELECT COUNT(*) FROM replies WHERE post_id = p.post_id) as reply_count
         FROM posts p
         JOIN profiles pr ON p.user_id = pr.user_id
@@ -63,7 +63,7 @@ function getDetail(int $userId): void {
     $db = getDB();
     $stmt = $db->prepare('
         SELECT p.post_id, p.content, p.created_at, p.user_id,
-               pr.name, pr.icon_id
+               TRIM(pr.last_name || ' ' || pr.first_name) AS name, pr.icon_id
         FROM posts p
         JOIN profiles pr ON p.user_id = pr.user_id
         WHERE p.post_id = ? AND p.deleted = 0
@@ -74,7 +74,7 @@ function getDetail(int $userId): void {
 
     $stmt2 = $db->prepare('
         SELECT r.reply_id, r.content, r.created_at, r.user_id,
-               pr.name, pr.icon_id
+               TRIM(pr.last_name || ' ' || pr.first_name) AS name, pr.icon_id
         FROM replies r
         JOIN profiles pr ON r.user_id = pr.user_id
         WHERE r.post_id = ?
@@ -106,7 +106,7 @@ function createReply(int $userId): void {
 
     // Create notification for post author
     if ($post['user_id'] !== $userId) {
-        $senderName = getDB()->query("SELECT name FROM profiles WHERE user_id = {$userId}")->fetchColumn();
+        $senderName = getDB()->query("SELECT TRIM(last_name || ' ' || first_name) FROM profiles WHERE user_id = {$userId}")->fetchColumn();
         $notifStmt = $db->prepare('INSERT INTO notifications (user_id, type, ref_id, message) VALUES (?, ?, ?, ?)');
         $notifStmt->execute([$post['user_id'], 'reply', $replyId, "{$senderName} さんが投稿に返信しました"]);
     }

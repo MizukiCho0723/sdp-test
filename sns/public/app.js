@@ -110,6 +110,9 @@ const GRAD_COURSES = {
 };
 
 // ---- 研究室データ（コースキー → 研究室リスト） ----
+// 学科・コース（または大学院の専攻）を選択すると、ここに登録された研究室が
+// プルダウンに一覧表示される。配列が空の間は自由入力欄にフォールバックする。
+// TODO: 各学科の公式サイトの研究室一覧をもとに '研究室名(教員名)' 形式で追加する
 const LAB_DATA = {
   '機械工学課程 基幹機械コース(機械工学科)': [
     '生産加工プロセス研究室(青木 孝史朗)',
@@ -155,6 +158,17 @@ const LAB_DATA = {
   '建築学科 - SAコース': [],
   '建築学科 - UAコース': [],
   '建築学科 - APコース': [],
+  // 大学院（専攻名がそのままキー）
+  '電気電子情報工学専攻': [],
+  '材料工学専攻': [],
+  '応用化学専攻': [],
+  '機械工学専攻': [],
+  'システム理工学専攻': [],
+  '国際理工学専攻': [],
+  '社会基盤学専攻': [],
+  '建築学専攻': [],
+  '地域環境システム専攻': [],
+  '機能制御システム専攻': [],
 };
 
 function getAllLabsForFaculty(faculty) {
@@ -186,6 +200,11 @@ function getFacultyForCourseKey(courseKey) {
 }
 
 function getCurrentCourseKey(pfx) {
+  // 大学院生: 専攻名がそのまま研究室データのキー
+  const gradGroup = document.getElementById(pfx + 'GradCourseGroup');
+  if (gradGroup && gradGroup.style.display !== 'none') {
+    return document.getElementById(pfx + 'GradCourseSelect')?.value || null;
+  }
   const faculty = document.getElementById(pfx + 'Faculty')?.value || '';
   if (!faculty) return null;
   const courseData = SHOZOKU_COURSES[faculty];
@@ -208,12 +227,14 @@ function updateLabSelect(pfx) {
   const otherGroup = document.getElementById(pfx + 'LabOtherGroup');
   if (!group) return;
   if (labs.length > 0) {
+    // 学科・専攻に登録済みの研究室を一覧表示して選択
     sel.innerHTML = '<option value="">選択してください</option>' +
       labs.map(l => `<option value="${l}">${l}</option>`).join('') +
       '<option value="__other__">その他（自由入力）</option>';
     group.style.display = 'block';
     otherGroup.style.display = 'none';
-  } else if (faculty) {
+  } else if (courseKey || faculty) {
+    // 研究室データ未登録の学科・専攻は自由入力
     group.style.display = 'none';
     otherGroup.style.display = 'block';
   } else {
@@ -365,6 +386,7 @@ function onGradeChange(pfx) {
     const gradOpt = fac.querySelector('option[value="大学院 理工学研究科"]');
     if (gradOpt) gradOpt.style.display = parseInt(grade) === 11 ? '' : 'none';
   }
+  updateLabSelect(pfx);
 }
 
 function onFacultyChange(pfx) {
@@ -604,15 +626,14 @@ document.getElementById('completeRegBtn').onclick = async () => {
   const confirm = document.getElementById('regPasswordConfirm').value;
   const lastName = document.getElementById('regLastName').value.trim();
   const firstName = document.getElementById('regFirstName').value.trim();
-  const name = lastName + (firstName ? ' ' + firstName : '');
   const grade = document.getElementById('regGrade').value;
-  if (!lastName) { showFieldError('regStep3Error', '氏名（名字）を入力してください'); return; }
+  if (!lastName) { showFieldError('regStep3Error', '氏名（姓）を入力してください'); return; }
   if (grade === '') { showFieldError('regStep3Error', '学年/職員欄を選択してください'); return; }
 
   const { department: regDept, course: regCourse } = getShozokuValues('reg');
   const res = await post(API.auth, {
     action: 'register', email, password, confirm_password: confirm,
-    name, grade,
+    last_name: lastName, first_name: firstName, grade,
     department: regDept,
     course: regCourse,
     lab: getLabValue('reg'),
@@ -857,9 +878,8 @@ async function loadEditProfile() {
   const res = await get(API.profiles, { action: 'get' });
   if (res.status !== 'ok') { showError('プロフィールの取得に失敗しました'); return; }
   const p = res.profile;
-  const nameParts = (p.name || '').split(' ');
-  document.getElementById('editLastName').value = nameParts[0] || '';
-  document.getElementById('editFirstName').value = nameParts.slice(1).join(' ') || '';
+  document.getElementById('editLastName').value = p.last_name || '';
+  document.getElementById('editFirstName').value = p.first_name || '';
   setShozokuValues('edit', p.department || '', p.course || '', p.grade ?? 1);
   updateLabSelect('edit');
   setLabValue('edit', p.lab || '');
@@ -873,15 +893,14 @@ document.getElementById('editProfileForm').onsubmit = async (e) => {
   clearFieldError('editProfileError');
   const editLastName = document.getElementById('editLastName').value.trim();
   const editFirstName = document.getElementById('editFirstName').value.trim();
-  const name = editLastName + (editFirstName ? ' ' + editFirstName : '');
   const bio = document.getElementById('editBio').value.trim();
-  if (!editLastName) { showFieldError('editProfileError', '名前（名字）を入力してください'); return; }
-  if (new Blob([name]).size > 64) { showFieldError('editProfileError', '名前は64バイト以下にしてください'); return; }
+  if (!editLastName) { showFieldError('editProfileError', '名前（姓）を入力してください'); return; }
+  if (new Blob([editLastName + ' ' + editFirstName]).size > 64) { showFieldError('editProfileError', '名前は64バイト以下にしてください'); return; }
   if (new Blob([bio]).size > 1024) { showFieldError('editProfileError', '自己紹介は1024バイト以下にしてください'); return; }
 
   const { department: editDept, course: editCourse } = getShozokuValues('edit');
   const res = await post(API.profiles, {
-    action: 'update', name,
+    action: 'update', last_name: editLastName, first_name: editFirstName,
     grade: document.getElementById('editGrade').value,
     department: editDept,
     course: editCourse,

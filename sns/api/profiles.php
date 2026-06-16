@@ -23,6 +23,7 @@ function getProfile(int $loginUserId): void {
     $db = getDB();
     $stmt = $db->prepare('
         SELECT pr.*, u.email,
+               TRIM(pr.last_name || ' ' || pr.first_name) AS name,
                (? = pr.user_id) AS is_own
         FROM profiles pr
         JOIN users u ON pr.user_id = u.user_id
@@ -35,10 +36,11 @@ function getProfile(int $loginUserId): void {
 }
 
 function updateProfile(int $userId): void {
-    $name = trim($_POST['name'] ?? '');
+    $lastName = trim($_POST['last_name'] ?? '');
+    $firstName = trim($_POST['first_name'] ?? '');
     $bio = trim($_POST['bio'] ?? '');
-    if ($name === '') jsonError('名前を入力してください（名前は必須項目です）');
-    if (strlen($name) > 64) jsonError('名前は64バイト以下（全角約21文字以内）にしてください');
+    if ($lastName === '') jsonError('名前（姓）を入力してください（名前は必須項目です）');
+    if (strlen($lastName . ' ' . $firstName) > 64) jsonError('名前は64バイト以下（全角約21文字以内）にしてください');
     if (strlen($bio) > 1024) jsonError('自己紹介は1024バイト以下（全角約340文字以内）にしてください');
 
     $grade = (int)($_POST['grade'] ?? 0);
@@ -50,10 +52,10 @@ function updateProfile(int $userId): void {
 
     $db = getDB();
     $stmt = $db->prepare('
-        UPDATE profiles SET name=?, grade=?, department=?, course=?, lab=?, clubs=?, bio=?, timetable=?
+        UPDATE profiles SET last_name=?, first_name=?, grade=?, department=?, course=?, lab=?, clubs=?, bio=?, timetable=?
         WHERE user_id=?
     ');
-    $stmt->execute([$name, $grade, $department, $course, $lab, $clubs, $bio, $timetable, $userId]);
+    $stmt->execute([$lastName, $firstName, $grade, $department, $course, $lab, $clubs, $bio, $timetable, $userId]);
     jsonOk();
 }
 
@@ -68,8 +70,10 @@ function searchProfiles(int $loginUserId): void {
     $clubs = trim($_GET['clubs'] ?? '');
 
     if ($name !== '') {
-        $conditions[] = 'pr.name LIKE :name';
+        // 「姓 名」「姓名」どちらの書き方でもヒットさせる
+        $conditions[] = "((pr.last_name || ' ' || pr.first_name) LIKE :name OR (pr.last_name || pr.first_name) LIKE :name2)";
         $params[':name'] = '%' . $name . '%';
+        $params[':name2'] = '%' . $name . '%';
     }
     if ($grade !== '') {
         $conditions[] = 'pr.grade = :grade';
@@ -92,10 +96,11 @@ function searchProfiles(int $loginUserId): void {
 
     $where = implode(' AND ', $conditions);
     $stmt = $db->prepare("
-        SELECT pr.user_id, pr.name, pr.icon_id, pr.grade, pr.department, pr.course, pr.bio
+        SELECT pr.user_id, TRIM(pr.last_name || ' ' || pr.first_name) AS name,
+               pr.icon_id, pr.grade, pr.department, pr.course, pr.bio
         FROM profiles pr
         WHERE {$where}
-        ORDER BY pr.name
+        ORDER BY pr.last_name, pr.first_name
         LIMIT 50
     ");
     $stmt->execute($params);

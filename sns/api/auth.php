@@ -64,7 +64,8 @@ function register(): void {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm = $_POST['confirm_password'] ?? '';
-    $name = trim($_POST['name'] ?? '');
+    $lastName = trim($_POST['last_name'] ?? '');
+    $firstName = trim($_POST['first_name'] ?? '');
     $grade = (int)($_POST['grade'] ?? -1);
 
     if (!validateEmail($email)) {
@@ -82,10 +83,10 @@ function register(): void {
     if ($password !== $confirm) {
         jsonError('パスワードが一致しません');
     }
-    if ($name === '') {
-        jsonError('氏名を入力してください');
+    if ($lastName === '') {
+        jsonError('氏名（姓）を入力してください');
     }
-    if (strlen($name) > 64) {
+    if (strlen($lastName . ' ' . $firstName) > 64) {
         jsonError('名前は64バイト以下にしてください');
     }
     if ($grade < 0) {
@@ -105,8 +106,8 @@ function register(): void {
         $clubs = trim($_POST['clubs'] ?? '');
         $bio = trim($_POST['bio'] ?? '');
 
-        $stmt2 = $db->prepare('INSERT INTO profiles (user_id, name, grade, department, course, lab, clubs, bio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-        $stmt2->execute([$userId, $name, $grade, $dept, $course, $lab, $clubs, $bio]);
+        $stmt2 = $db->prepare('INSERT INTO profiles (user_id, last_name, first_name, grade, department, course, lab, clubs, bio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt2->execute([$userId, $lastName, $firstName, $grade, $dept, $course, $lab, $clubs, $bio]);
 
         $db->exec("DELETE FROM auth_codes WHERE email = '{$email}'");
         $db->commit();

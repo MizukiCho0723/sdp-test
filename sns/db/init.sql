@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS profiles (
     user_id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    first_name TEXT DEFAULT '',
     grade INTEGER DEFAULT 0,  -- 0=教員, 1-4=学年
     department TEXT DEFAULT '',
     course TEXT DEFAULT '',

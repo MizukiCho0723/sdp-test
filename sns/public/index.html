@@ -118,7 +118,7 @@
         </div>
         <div class="form-group" id="regGradCourseGroup" style="display:none;">
           <label>専攻</label>
-          <select id="regGradCourseSelect">
+          <select id="regGradCourseSelect" onchange="updateLabSelect('reg')">
             <option value="">選択してください</option>
           </select>
         </div>
@@ -430,7 +430,7 @@
           </div>
           <div class="form-group" id="editGradCourseGroup" style="display:none;">
             <label>専攻</label>
-            <select id="editGradCourseSelect">
+            <select id="editGradCourseSelect" onchange="updateLabSelect('edit')">
               <option value="">選択してください</option>
             </select>
           </div>

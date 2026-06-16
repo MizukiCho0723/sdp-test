@@ -39,7 +39,7 @@ function sendMessage(int $userId): void {
     $dmId = (int)$db->lastInsertId();
 
     // Notification
-    $senderName = $db->query("SELECT name FROM profiles WHERE user_id = {$userId}")->fetchColumn();
+    $senderName = $db->query("SELECT TRIM(last_name || ' ' || first_name) FROM profiles WHERE user_id = {$userId}")->fetchColumn();
     $notifStmt = $db->prepare('INSERT INTO notifications (user_id, type, ref_id, message) VALUES (?, ?, ?, ?)');
     $notifStmt->execute([$receiverId, 'message', $dmId, "{$senderName} さんからメッセージが届きました"]);
 
@@ -54,7 +54,8 @@ function getHistory(int $userId): void {
     $db = getDB();
     $stmt = $db->prepare('
         SELECT m.dm_id, m.sender_id, m.receiver_id, m.content, m.sent_at, m.is_read,
-               ps.name as sender_name, pr.name as receiver_name
+               TRIM(ps.last_name || ' ' || ps.first_name) as sender_name,
+               TRIM(pr.last_name || ' ' || pr.first_name) as receiver_name
         FROM messages m
         JOIN profiles ps ON m.sender_id = ps.user_id
         JOIN profiles pr ON m.receiver_id = pr.user_id
@@ -69,7 +70,7 @@ function getHistory(int $userId): void {
     $readStmt = $db->prepare('UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0');
     $readStmt->execute([$partnerId, $userId]);
 
-    $partnerStmt = $db->prepare('SELECT pr.*, u.email FROM profiles pr JOIN users u ON pr.user_id = u.user_id WHERE pr.user_id = ?');
+    $partnerStmt = $db->prepare("SELECT pr.*, u.email, TRIM(pr.last_name || ' ' || pr.first_name) AS name FROM profiles pr JOIN users u ON pr.user_id = u.user_id WHERE pr.user_id = ?");
     $partnerStmt->execute([$partnerId]);
     $partner = $partnerStmt->fetch();
 
@@ -89,7 +90,7 @@ function getPartners(int $userId): void {
 
     $partners = [];
     foreach ($partnerIds as $pid) {
-        $pr = $db->prepare('SELECT name, icon_id FROM profiles WHERE user_id = ?');
+        $pr = $db->prepare("SELECT TRIM(last_name || ' ' || first_name) AS name, icon_id FROM profiles WHERE user_id = ?");
         $pr->execute([$pid]);
         $profile = $pr->fetch();
         if (!$profile) continue;
