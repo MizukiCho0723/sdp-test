@@ -13,22 +13,22 @@ export function handleMessages(req, res) {
 
   switch (action) {
     case 'send':
-      M1_sendMessage(req, res, userId);
+      sendMessage(req, res, userId);
       break;
     case 'history':
-      M2_getMessageHistory(req, res, userId);
+      getMessageHistory(req, res, userId);
       break;
     case 'partners':
-      M6_getMessagePartners(req, res, userId);
+      getMessagePartners(req, res, userId);
       break;
     case 'mark_read':
-      M4_markAsRead(req, res, userId);
+      markAsRead(req, res, userId);
       break;
     case 'unread_notifications':
-      M5_getUnreadMessageNotifications(req, res, userId);
+      getUnreadMessageNotifications(req, res, userId);
       break;
     case 'realtime_update':
-      M3_updateNewMessages(req, res, userId);
+  　　updateNewMessages(req, res, userId);
       break;
     default:
       jsonError(res, '不正なアクション');
