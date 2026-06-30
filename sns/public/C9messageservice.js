@@ -28,7 +28,7 @@ export function handleMessages(req, res) {
       getUnreadMessageNotifications(req, res, userId);
       break;
     case 'realtime_update':
-  　　updateNewMessages(req, res, userId);
+      updateNewMessages(req, res, userId);
       break;
     default:
       jsonError(res, '不正なアクション');
