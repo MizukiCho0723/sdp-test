@@ -13,19 +13,19 @@ export function handleProfiles(req, res) {
 
   switch (action) {
     case 'get':
-      M1_getProfile(req, res, userId);
+      getProfile(req, res, userId);
       break;
     case 'update':
-      M2_updateProfile(req, res, userId);
+      updateProfile(req, res, userId);
       break;
     case 'search':
-      M3_searchProfiles(req, res, userId);
+      searchProfiles(req, res, userId);
       break;
     case 'exists':
-      M4_existsUser(req, res, userId);
+      existsUser(req, res, userId);
       break;
     case 'init':
-      M5_createInitialProfile(req, res, userId);
+      createInitialProfile(req, res, userId);
       break;
     default:
       jsonError(res, '不正なアクション');
